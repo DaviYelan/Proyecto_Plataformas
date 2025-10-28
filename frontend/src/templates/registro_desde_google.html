@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2>Completa tu perfil</h2>
+  <p>Hemos obtenido algunos datos de tu cuenta Google. Revisa y completa los campos faltantes.</p>
+  <form method="post" action="{{ url_for('router.completar_perfil') }}">
+    <div class="form-group">
+      <label for="nombre">Nombre</label>
+      <input type="text" class="form-control" id="nombre" name="nombre" value="{{ valores.nombre or '' }}" required>
+    </div>
+    <div class="form-group">
+      <label for="apellido">Apellido</label>
+      <input type="text" class="form-control" id="apellido" name="apellido" value="{{ valores.apellido or '' }}" required>
+    </div>
+    <div class="form-group">
+      <label for="correo">Correo electrónico</label>
+      <input type="email" class="form-control" id="correo" name="correo" value="{{ valores.correo or '' }}" readonly required>
+    </div>
+    <div class="form-group">
+      <label for="numero_identificacion">Número de identificación (opcional)</label>
+      <input type="text" class="form-control" id="numero_identificacion" name="numero_identificacion" value="{{ valores.numero_identificacion or '' }}">
+    </div>
+    <div class="form-group">
+      <label for="fecha_nacimiento">Fecha de nacimiento (opcional)</label>
+      <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" value="{{ valores.fecha_nacimiento or '' }}">
+    </div>
+    <div class="form-group">
+      <label for="contrasenia">Contraseña (elige una para acceder luego sin Google)</label>
+      <input type="password" class="form-control" id="contrasenia" name="contrasenia" placeholder="Dejar en blanco generará una contraseña automática">
+    </div>
+    <button type="submit" class="btn btn-primary">Crear y continuar</button>
+    <a href="{{ url_for('router.iniciar_sesion') }}" class="btn btn-secondary">Cancelar</a>
+  </form>
+</div>
+{% endblock %}
