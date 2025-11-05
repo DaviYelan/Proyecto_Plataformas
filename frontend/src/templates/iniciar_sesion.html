@@ -168,9 +168,8 @@
             // Google login
             $('#google-login').on('click', function (e) {
                 e.preventDefault();
-                // Iniciar OAuth directamente desde el frontend (no dependemos del backend aquí)
-                // Redirigimos a la ruta local que construye la URL de Google.
-                window.location.href = "{{ url_for('router.google_login') }}";
+                
+                globalThis.location.href = "{{ url_for('router.google_login') }}";
             });
         });
     </script>

@@ -22,7 +22,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.GET;
 
 @Path("/descuento")
-@Secured(roles = {"ADMIN"})
+//@Secured(roles = {"ADMIN"})
 public class Descuento_api {
 
     @Path("/lista")

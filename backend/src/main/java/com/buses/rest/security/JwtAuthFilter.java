@@ -97,18 +97,9 @@ public class JwtAuthFilter implements ContainerRequestFilter {
     }
 
     private String mapRole(String role) {
-        // normalize common role names: 'Administrador' -> 'ADMIN' etc.
+        // No normalizar, solo devolver el valor original en mayúsculas
         if (role == null) return "";
-        switch (role.toLowerCase()) {
-            case "administrador":
-            case "admin":
-                return "ADMIN";
-            case "cliente":
-            case "user":
-                return "CLIENT";
-            default:
-                return role.toUpperCase();
-        }
+        return role;
     }
 
     private void abort(ContainerRequestContext ctx, Response.Status status, String msg) {

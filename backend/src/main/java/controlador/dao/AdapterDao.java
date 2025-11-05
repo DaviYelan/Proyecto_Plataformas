@@ -17,7 +17,7 @@ import org.bson.Document;
 public class AdapterDao<T> implements InterfazDao<T> {
     private Class<T> clazz;
     private Gson g;
-    public static String filePath = "data/";
+     public static String filePath = "data/";
 
     public AdapterDao(Class<T> clazz) {
         this.clazz = clazz;

@@ -58,7 +58,7 @@ public class Frecuencia_api {
     @SuppressWarnings("unchecked")
     @Path("/guardar")
     @POST
-    @Secured(roles = {"ADMIN"})
+    //@Secured(roles = {"ADMIN"})
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response save(HashMap<String, Object> map) {
@@ -94,7 +94,7 @@ public class Frecuencia_api {
 
     @Path("/eliminar/{id}")
     @DELETE
-    @Secured(roles = {"ADMIN"})
+   // @Secured(roles = {"ADMIN"})
     @Produces(MediaType.APPLICATION_JSON)
     public Response delete(@PathParam("id") Integer id) {
         HashMap<String, Object> response = new HashMap<>();
@@ -118,7 +118,7 @@ public class Frecuencia_api {
     @SuppressWarnings("unchecked")
     @Path("/actualizar")
     @PUT
-    @Secured(roles = {"ADMIN"})
+    //@Secured(roles = {"ADMIN"})
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response update(HashMap<String, Object> map) {

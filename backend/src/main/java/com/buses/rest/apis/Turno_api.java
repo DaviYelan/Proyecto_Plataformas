@@ -23,7 +23,7 @@ import javax.ws.rs.GET;
 import modelo.Horario;
 import modelo.Turno;
 
-@Secured(roles = {"ADMIN"})
+//@Secured(roles = {"ADMIN"})
 @Path("/turno")
 public class Turno_api {
 
@@ -34,6 +34,7 @@ public class Turno_api {
         HashMap<String, Object> response = new HashMap<>();
         Controlador_turno ct = new Controlador_turno();
         response.put("msg", "Lista de turnos");
+        System.out.println("Cantidad de turnos: " + ct.Lista_turnos().getSize());
         response.put("turnos", ct.Lista_turnos().toArray());
         if (ct.Lista_turnos().isEmpty()) {
             response.put("turnos", new Object[] {});

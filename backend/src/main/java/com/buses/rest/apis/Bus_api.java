@@ -21,7 +21,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.GET;
 import modelo.Bus;
 
-@Secured(roles = {"ADMIN"})
+//@Secured(roles = {"Administrador"})
 @Path("/bus")
 public class Bus_api {
 
@@ -32,6 +32,7 @@ public class Bus_api {
         HashMap<String, Object> response = new HashMap<>();
         Controlador_bus cb = new Controlador_bus();
         response.put("msg", "Lista de buses");
+        System.out.println("Cantidad de buses: " + cb.Lista_buses().getSize());
         response.put("buses", cb.Lista_buses().toArray());
         if (cb.Lista_buses().isEmpty()) {
             response.put("buses", new Object[] {});

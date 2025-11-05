@@ -25,7 +25,7 @@ import modelo.Escala;
 import modelo.Ruta;
 import modelo.Bus;
 
-@Secured(roles = {"ADMIN"})
+//@Secured(roles = {"Administrador"})
 @Path("/ruta")
 public class Ruta_api {
 

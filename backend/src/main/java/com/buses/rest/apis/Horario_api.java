@@ -23,7 +23,7 @@ import modelo.Horario;
 
 import modelo.Ruta;
 
-@Secured(roles = {"ADMIN"})
+//@Secured(roles = {"ADMIN"})
 @Path("/horario")
 public class Horario_api {
 

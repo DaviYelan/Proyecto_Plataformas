@@ -24,7 +24,7 @@ import java.util.List;
 import modelo.Cuenta;
 
 @Path("/cuenta")
-@Secured(roles = {"ADMIN"})
+//@Secured(roles = {"ADMIN"})
 public class Cuenta_api {
 
     @Path("/lista")

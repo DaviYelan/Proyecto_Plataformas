@@ -2208,7 +2208,7 @@
       "genero": "Masculino",
       "correo": "luillis@gmail.com",
       "telefono": "098 762 6289",
-      "direccion": "Andrï¿½s Bello, Los Apuros, Loja, 110110, Ecuador",
+      "direccion": "Andrés Bello, Los Apuros, Loja, 110110, Ecuador",
       "fecha_nacimiento": "14/02/1950",
       "saldo_disponible": 4.5,
       "tipo_tarifa": "General",
@@ -2310,7 +2310,7 @@
       "genero": "Masculino",
       "correo": "luillis@gmail.com",
       "telefono": "098 762 6289",
-      "direccion": "Andrï¿½s Bello, Los Apuros, Loja, 110110, Ecuador",
+      "direccion": "Andrés Bello, Los Apuros, Loja, 110110, Ecuador",
       "fecha_nacimiento": "14/02/1950",
       "saldo_disponible": 4.5,
       "tipo_tarifa": "General",
@@ -2412,7 +2412,7 @@
       "genero": "Masculino",
       "correo": "luillis@gmail.com",
       "telefono": "098 762 6289",
-      "direccion": "Andrï¿½s Bello, Los Apuros, Loja, 110110, Ecuador",
+      "direccion": "Andrés Bello, Los Apuros, Loja, 110110, Ecuador",
       "fecha_nacimiento": "14/02/1950",
       "saldo_disponible": 4.5,
       "tipo_tarifa": "General",
@@ -2514,7 +2514,7 @@
       "genero": "Masculino",
       "correo": "luillis@gmail.com",
       "telefono": "098 762 6289",
-      "direccion": "Andrï¿½s Bello, Los Apuros, Loja, 110110, Ecuador",
+      "direccion": "Andrés Bello, Los Apuros, Loja, 110110, Ecuador",
       "fecha_nacimiento": "14/02/1950",
       "saldo_disponible": 4.5,
       "tipo_tarifa": "General",
@@ -2923,278 +2923,6 @@
         "titular": "Miguelin",
         "fecha_vencimiento": "11/25",
         "codigo_seguridad": "1231",
-        "opcion_pago": "Tarjeta_credito"
-      }
-    },
-    "turno": {
-      "id_turno": 8,
-      "fecha_salida": "25/10/2025",
-      "numero_turno": 8,
-      "estado_turno": "Disponible",
-      "horario": {
-        "id_horario": 3,
-        "hora_salida": "03:00",
-        "hora_llegada": "05:24",
-        "estado_horario": "Disponible",
-        "ruta": {
-          "id_ruta": 1,
-          "origen": "Loja",
-          "destino": "Quito",
-          "precio_unitario": 10.0,
-          "distancia": 120,
-          "tiempo_estimado": "2h 24min",
-          "estado_ruta": "Disponible",
-          "bus": {
-            "id_bus": 1,
-            "numero_bus": 1,
-            "placa": "BIP-1234",
-            "marca": "Toyota",
-            "modelo": "2020",
-            "capacidad_pasajeros": 30,
-            "Velocidad": 50,
-            "estado_bus": "Activo",
-            "cooperativa": {
-              "id_cooperativa": 1,
-              "nombre_cooperativa": "Cooperativa Loja",
-              "ruc": "1791234567899",
-              "direccion": "10 de agosto",
-              "telefono": "098 765 4321",
-              "correo_empresarial": "cooperativa.loja@gmail.com"
-            }
-          }
-        }
-      }
-    },
-    "descuento": {
-      "id_descuento": 1,
-      "nombre_descuento": "General",
-      "descripcion": "Descuento base aplicado a todos los usuarios",
-      "porcentaje": 0,
-      "estado_descuento": "Activo",
-      "tipo_descuento": "General"
-    }
-  },
-  {
-    "id_boleto": 32,
-    "fecha_compra": "06/10/2025",
-    "numero_asiento": 6,
-    "cantidad_boleto": 1,
-    "precio_final": 1.5,
-    "estado_boleto": "Vendido",
-    "persona": {
-      "id_persona": 16,
-      "tipo_identificacion": "Cedula",
-      "numero_identificacion": "1105526178",
-      "nombre": "lucho",
-      "apellido": "armijos",
-      "genero": "No_definido",
-      "correo": "luchoa12@gmail.com",
-      "telefono": "",
-      "direccion": "",
-      "fecha_nacimiento": "18/04/2003",
-      "saldo_disponible": 978.5,
-      "tipo_tarifa": "General",
-      "cuenta": {
-        "id_cuenta": 16,
-        "correo": "luchoa12@gmail.com",
-        "contrasenia": "luchito1234",
-        "estado_cuenta": "Activo",
-        "tipo_cuenta": "Cliente"
-      },
-      "metodo_pago": {
-        "id_pago": 11,
-        "saldo": 0.0,
-        "numero_tarjeta": "1231-3132-1321-3132",
-        "titular": "Lucho",
-        "fecha_vencimiento": "01/30",
-        "codigo_seguridad": "4785",
-        "opcion_pago": "Tarjeta_credito"
-      }
-    },
-    "turno": {
-      "id_turno": 5,
-      "fecha_salida": "12/12/2025",
-      "numero_turno": 5,
-      "estado_turno": "Disponible",
-      "horario": {
-        "id_horario": 4,
-        "hora_salida": "12:00",
-        "hora_llegada": "13:10",
-        "estado_horario": "Disponible",
-        "ruta": {
-          "id_ruta": 4,
-          "origen": "loja",
-          "destino": "catamayo",
-          "precio_unitario": 1.5,
-          "distancia": 45,
-          "tiempo_estimado": "1h 10min",
-          "estado_ruta": "Disponible",
-          "escalas": {
-            "header": {
-              "info": {
-                "id_escala": 3,
-                "lugar_escala": "villonaco",
-                "tiempo": "00:10"
-              }
-            },
-            "last": {
-              "info": {
-                "id_escala": 3,
-                "lugar_escala": "villonaco",
-                "tiempo": "00:10"
-              }
-            },
-            "size": 1
-          },
-          "bus": {
-            "id_bus": 4,
-            "numero_bus": 4,
-            "placa": "BIPT-4567",
-            "marca": "Volkswagen",
-            "modelo": "2010",
-            "capacidad_pasajeros": 30,
-            "Velocidad": 45,
-            "estado_bus": "Activo",
-            "cooperativa": {
-              "id_cooperativa": 1,
-              "nombre_cooperativa": "Cooperativa Loja",
-              "ruc": "1791234567899",
-              "direccion": "10 de agosto",
-              "telefono": "098 765 4321",
-              "correo_empresarial": "cooperativa.loja@gmail.com"
-            }
-          }
-        }
-      }
-    },
-    "descuento": {
-      "id_descuento": 1,
-      "nombre_descuento": "General",
-      "descripcion": "Descuento base aplicado a todos los usuarios",
-      "porcentaje": 0,
-      "estado_descuento": "Activo",
-      "tipo_descuento": "General"
-    }
-  },
-  {
-    "id_boleto": 33,
-    "fecha_compra": "14/10/2025",
-    "numero_asiento": 5,
-    "cantidad_boleto": 1,
-    "precio_final": 10.0,
-    "estado_boleto": "Vendido",
-    "persona": {
-      "id_persona": 16,
-      "tipo_identificacion": "Cedula",
-      "numero_identificacion": "1105526178",
-      "nombre": "lucho",
-      "apellido": "armijos",
-      "genero": "No_definido",
-      "correo": "luchoa12@gmail.com",
-      "telefono": "",
-      "direccion": "",
-      "fecha_nacimiento": "18/04/2003",
-      "saldo_disponible": 978.5,
-      "tipo_tarifa": "General",
-      "cuenta": {
-        "id_cuenta": 16,
-        "correo": "luchoa12@gmail.com",
-        "contrasenia": "luchito1234",
-        "estado_cuenta": "Activo",
-        "tipo_cuenta": "Cliente"
-      },
-      "metodo_pago": {
-        "id_pago": 11,
-        "saldo": 0.0,
-        "numero_tarjeta": "1231-3132-1321-3132",
-        "titular": "Lucho",
-        "fecha_vencimiento": "01/30",
-        "codigo_seguridad": "4785",
-        "opcion_pago": "Tarjeta_credito"
-      }
-    },
-    "turno": {
-      "id_turno": 8,
-      "fecha_salida": "25/10/2025",
-      "numero_turno": 8,
-      "estado_turno": "Disponible",
-      "horario": {
-        "id_horario": 3,
-        "hora_salida": "03:00",
-        "hora_llegada": "05:24",
-        "estado_horario": "Disponible",
-        "ruta": {
-          "id_ruta": 1,
-          "origen": "Loja",
-          "destino": "Quito",
-          "precio_unitario": 10.0,
-          "distancia": 120,
-          "tiempo_estimado": "2h 24min",
-          "estado_ruta": "Disponible",
-          "bus": {
-            "id_bus": 1,
-            "numero_bus": 1,
-            "placa": "BIP-1234",
-            "marca": "Toyota",
-            "modelo": "2020",
-            "capacidad_pasajeros": 30,
-            "Velocidad": 50,
-            "estado_bus": "Activo",
-            "cooperativa": {
-              "id_cooperativa": 1,
-              "nombre_cooperativa": "Cooperativa Loja",
-              "ruc": "1791234567899",
-              "direccion": "10 de agosto",
-              "telefono": "098 765 4321",
-              "correo_empresarial": "cooperativa.loja@gmail.com"
-            }
-          }
-        }
-      }
-    },
-    "descuento": {
-      "id_descuento": 1,
-      "nombre_descuento": "General",
-      "descripcion": "Descuento base aplicado a todos los usuarios",
-      "porcentaje": 0,
-      "estado_descuento": "Activo",
-      "tipo_descuento": "General"
-    }
-  },
-  {
-    "id_boleto": 34,
-    "fecha_compra": "14/10/2025",
-    "numero_asiento": 6,
-    "cantidad_boleto": 1,
-    "precio_final": 10.0,
-    "estado_boleto": "Vendido",
-    "persona": {
-      "id_persona": 16,
-      "tipo_identificacion": "Cedula",
-      "numero_identificacion": "1105526178",
-      "nombre": "lucho",
-      "apellido": "armijos",
-      "genero": "No_definido",
-      "correo": "luchoa12@gmail.com",
-      "telefono": "",
-      "direccion": "",
-      "fecha_nacimiento": "18/04/2003",
-      "saldo_disponible": 978.5,
-      "tipo_tarifa": "General",
-      "cuenta": {
-        "id_cuenta": 16,
-        "correo": "luchoa12@gmail.com",
-        "contrasenia": "luchito1234",
-        "estado_cuenta": "Activo",
-        "tipo_cuenta": "Cliente"
-      },
-      "metodo_pago": {
-        "id_pago": 11,
-        "saldo": 0.0,
-        "numero_tarjeta": "1231-3132-1321-3132",
-        "titular": "Lucho",
-        "fecha_vencimiento": "01/30",
-        "codigo_seguridad": "4785",
         "opcion_pago": "Tarjeta_credito"
       }
     },

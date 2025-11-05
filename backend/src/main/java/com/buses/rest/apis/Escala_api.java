@@ -28,6 +28,7 @@ public class Escala_api {
         HashMap<String, Object> response = new HashMap<>();
         Controlador_escala ce = new Controlador_escala();
         response.put("msg", "Lista de escalas");
+        System.out.println("Cantidad de escalas: " + ce.Lista_escala().getSize());
         response.put("escalas", ce.Lista_escala().toArray());
         if (ce.Lista_escala().isEmpty()) {
             response.put("escalas", new Object[] {});
@@ -55,7 +56,7 @@ public class Escala_api {
 
     @Path("/guardar")
     @POST
-    @Secured(roles = {"ADMIN"})
+    //@Secured(roles = {"ADMIN"})
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response save(HashMap<String, Object> map) {
@@ -85,7 +86,7 @@ public class Escala_api {
 
     @Path("/eliminar/{id}")
     @DELETE
-    @Secured(roles = {"ADMIN"})
+    //@Secured(roles = {"ADMIN"})
     @Produces(MediaType.APPLICATION_JSON)
     public Response delete(@PathParam("id") Integer id) {
         HashMap<String, Object> response = new HashMap<>();
@@ -108,7 +109,7 @@ public class Escala_api {
 
     @Path("/actualizar")
     @PUT
-    @Secured(roles = {"ADMIN"})
+    //@Secured(roles = {"ADMIN"})
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response update(HashMap<String, Object> map) {

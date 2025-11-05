@@ -88,14 +88,5 @@
     "fecha_vencimiento": "11/25",
     "codigo_seguridad": "1231",
     "opcion_pago": "Tarjeta_credito"
-  },
-  {
-    "id_pago": 11,
-    "saldo": 0.0,
-    "numero_tarjeta": "1231-3132-1321-3132",
-    "titular": "Lucho",
-    "fecha_vencimiento": "01/30",
-    "codigo_seguridad": "4785",
-    "opcion_pago": "Tarjeta_credito"
   }
 ]

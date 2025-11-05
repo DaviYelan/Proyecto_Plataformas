@@ -1,31 +1,29 @@
-from flask import Blueprint, jsonify, render_template, flash, redirect, request, session, url_for, render_template_string
-from datetime import datetime, timedelta, timezone
+from flask import Blueprint, jsonify, render_template, flash, redirect, request, session, url_for
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime, timedelta
+from email.mime.text import MIMEText
 from flask import make_response
 from dotenv import load_dotenv
 from functools import wraps
-from os import getenv
+from fpdf import FPDF
 from ..config import API_URL
+from os import getenv
 import requests
 import secrets
+import smtplib
+import qrcode
 import time
 import json
 import jwt
 import os
-import traceback
-from urllib.parse import unquote_plus
 
 router = Blueprint("router", __name__)
 
 load_dotenv()
 SECRET_KEY = getenv("JWT_SECRET_KEY", "tu_contrasenia_secreta")
+ALGORITHM = "HS256"
 
-
-# Helpers y decoradores de sesión
 def backend_request(method, path, **kwargs):
-    """Realiza una petición al backend (API_URL) incluyendo el token de sesión si existe.
-    Devuelve un objeto requests.Response (en caso de fallo devuelve una Response con status_code 500).
-    """
-    # Construir URL
     try:
         if str(path).startswith("http"):
             url = path
@@ -46,76 +44,112 @@ def backend_request(method, path, **kwargs):
         resp._content = str(e).encode("utf-8")
         return resp
 
+def generar_token(user_data):
+    payload = {
+        "user_id": user_data.get("id"),
+        "tipo_cuenta": user_data.get("tipo_cuenta"),
+        "exp": datetime.utcnow() + timedelta(hours=1),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-def obtener_info_usuario():
-    """Devuelve la información del usuario para pasar a las plantillas.
-    """
-    return session.get("user", {})
 
+def validar_token(token):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+
+def requiere_token(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = session.get("token")
+        if not token:
+            return redirect(url_for("router.iniciar_sesion"))
+        payload = validar_token(token)
+        if not payload:
+            session.clear()
+            return redirect(url_for("router.iniciar_sesion"))
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+def no_cache(view_function):
+    @wraps(view_function)
+    def decorated_function(*args, **kwargs):
+        response = make_response(view_function(*args, **kwargs))
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+    return decorated_function
+
+
+@router.route("/")
+def home():
+    return render_template("index.html")
 
 def requiere_iniciar(f):
     @wraps(f)
-    def wrapper(*args, **kwargs):
-        if "user" not in session:
-            # Guardar la URL solicitada para redirigir después del login
-            try:
-                session["redirect_after_login"] = request.path
-            except Exception:
-                pass
-            flash(LOGIN_REQUIRED_MESSAGE, "warning")
+    def decorated_function(*args, **kwargs):
+        if not session.get("user"):
+            flash("Por favor inicie sesión para continuar", "warning")
             return redirect(url_for("router.iniciar_sesion"))
         return f(*args, **kwargs)
 
-    return wrapper
-
-
-def requiere_cliente(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if "user" not in session:
-            try:
-                session["redirect_after_login"] = request.path
-            except Exception:
-                pass
-            flash(LOGIN_REQUIRED_MESSAGE, "warning")
-            return redirect(url_for("router.iniciar_sesion"))
-        if session.get("user", {}).get("tipo_cuenta") != "Cliente":
-            flash("Acceso no autorizado", "danger")
-            return redirect(url_for("router.iniciar_sesion"))
-        return f(*args, **kwargs)
-
-    return wrapper
-
+    return decorated_function
 
 def requiere_administrador(f):
     @wraps(f)
-    def wrapper(*args, **kwargs):
-        if "user" not in session:
-            try:
-                session["redirect_after_login"] = request.path
-            except Exception:
-                pass
-            flash(LOGIN_REQUIRED_MESSAGE, "warning")
+    @no_cache
+    def decorated_function(*args, **kwargs):
+        if not session.get("user"):
+            flash("Por favor inicie sesión para continuar", "warning")
             return redirect(url_for("router.iniciar_sesion"))
         if session.get("user", {}).get("tipo_cuenta") != "Administrador":
             flash("Acceso no autorizado", "danger")
             return redirect(url_for("router.cliente"))
         return f(*args, **kwargs)
 
-    return wrapper
-      
-@router.route("/")
-def home():
-    return render_template("index.html")
+    return decorated_function
 
-LOGIN_REQUIRED_MESSAGE = "Por favor inicie sesión para continuar"
+def requiere_cliente(f):
+    @wraps(f)
+    @no_cache
+    def decorated_function(*args, **kwargs):
+        if not session.get("user"):
+            flash("Por favor inicie sesión para continuar", "warning")
+            return redirect(url_for("router.iniciar_sesion"))
+        if session.get("user", {}).get("tipo_cuenta") != "Cliente":
+            flash("Acceso no autorizado", "danger")
+            return redirect(url_for("router.administrador"))
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+def obtener_info_usuario():
+    try:
+        usuario_id = session.get("user", {}).get("id")
+        r_usuario = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}")
+        datos_usuario = r_usuario.json().get("persona", {}) if r_usuario.status_code == 200 else {}
+        return {
+            "nombre": datos_usuario.get("nombre", "Usuario"),
+            "apellido": datos_usuario.get("apellido", ""),
+        }
+    except:
+        return {"nombre": "Usuario", "apellido": ""}
 
 
 @router.route("/verificar_sesion")
 def verificar_sesion():
     return jsonify({"sesion_activa": "user" in session})
 
-
+# Inicio de sesión
 @router.route("/iniciar_sesion", methods=["GET", "POST"])
 def iniciar_sesion():
     if "user" in session:
@@ -197,9 +231,9 @@ def cerrar_sesion():
     flash("Has cerrado sesión exitosamente", "success")
     return redirect(url_for("router.iniciar_sesion"))
 
+
 @router.route("/registro", methods=["GET", "POST"])
 def registro():
-    # Si se llama por GET con ?correo=..., prellenar el formulario con ese correo
     if request.method == "GET":
         correo_prefill = request.args.get('correo')
         valores = {"correo": correo_prefill} if correo_prefill else {}
@@ -422,7 +456,6 @@ def _load_backend_google_config():
     except Exception:
         return {"client_id": None, "client_secret": None, "redirect_uri": None}
 
-
 @router.route("/auth/google")
 def google_login():
     cfg = _load_backend_google_config()
@@ -449,7 +482,6 @@ def google_login():
     except Exception:
         pass
     return redirect(auth_url)
-
 
 @router.route("/auth/google/callback", methods=["GET", "POST"])
 def google_callback():
@@ -694,11 +726,9 @@ def google_callback():
     flash("Inicio temporal permitido con Google. Completa tu perfil luego para persistir la cuenta.", "success")
     return redirect(url_for("router.cliente"))
 
-
 @router.route("/auth/google/receive", methods=["GET", "POST"])
 def google_receive():
     return google_callback()
-
 
 @router.route('/auth/google/complete', methods=['POST'])
 def google_complete_registration():
@@ -832,7 +862,6 @@ def google_complete_registration():
             token = login_resp.json().get('token') or login_resp.json().get('access_token')
             if token:
                 session['token'] = token
-                # Con token, pedir la lista protegida y buscar la persona
                 try:
                     personas_resp = backend_request('GET', '/api/persona/lista')
                     if personas_resp.status_code == 200:
@@ -851,8 +880,6 @@ def google_complete_registration():
                             return jsonify({'success': True, 'message': 'Cuenta creada correctamente'})
                 except Exception:
                     pass
-
-        # Si llegamos aquí, creación devolvió 200 pero no pudimos confirmar la persona en la lista
         try:
             print('[google_complete_registration] Created but could not confirm persona in lista. crear_resp.text=', crear_resp.text)
         except Exception:
@@ -860,9 +887,7 @@ def google_complete_registration():
         return jsonify({'success': True, 'message': 'Cuenta creada (no se pudo confirmar)'}), 200
     except Exception:
         pass
-
     return jsonify({'success': True, 'message': 'Cuenta creada (no se pudo confirmar)'}), 200
-
 
 # Recuperacion de contraseña
 @router.route("/recuperar-contrasenia", methods=["GET", "POST"])
@@ -1489,7 +1514,7 @@ def eliminar_metodo_pago():
         usuario_id = data.get("id_persona")
         if not usuario_id:
             return jsonify({"success": False, "message": "ID de usuario no proporcionado"}), 400
-        r_usuario = requests.get(f"http://localhost:8099/api/persona/lista/{usuario_id}")
+        r_usuario = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}")
         if r_usuario.status_code != 200:
             return jsonify({"success": False, "message": "Error al obtener datos del usuario"}), 400
         datos_actuales = r_usuario.json().get("persona", {})
@@ -1521,13 +1546,7 @@ def eliminar_metodo_pago():
     except Exception as e:
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
-
-# Funciones de boletos
-
-
 # Funciones de pago
-
-
 @router.route("/procesar_pago", methods=["GET", "POST"])
 @requiere_iniciar
 def procesar_pago():
@@ -1826,7 +1845,7 @@ def generar_boleto_pdf(boleto_id):
 @router.route("/generar_ticket/<int:boleto_id>")
 def generar_ticket_pdf(boleto_id):
     try:
-        response = requests.get(f"http://localhost:8099/api/boleto/lista/{boleto_id}")
+        response = requests.get(f"{API_URL}/api/boleto/lista/{boleto_id}")
         if response.status_code != 200:
             return jsonify({"error": "Boleto no encontrado"}), 404
         boleto = response.json().get("boleto", {})
@@ -1927,16 +1946,20 @@ def generar_ticket_pdf(boleto_id):
 def lista_cooperativa():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/cooperativa/lista")
+        r = requests.get(f"{API_URL}/api/cooperativa/lista")
+        print("[lista_cooperativa] status_code:", r.status_code)
+        print("[lista_cooperativa] response text:", r.text)
         if r.status_code == 200:
             try:
                 data = r.json()
+                print("[lista_cooperativa] data:", data)
                 return render_template(
                     "crud/cooperativa/cooperativa.html",
                     lista=data.get("cooperativas", []),
                     usuario=usuario,
                 )
             except json.JSONDecodeError as je:
+                print("[lista_cooperativa] JSONDecodeError:", je)
                 flash("Error al decodificar la respuesta del servidor", "error")
                 return render_template(
                     "crud/cooperativa/cooperativa.html", lista=[], usuario=usuario
@@ -1945,6 +1968,7 @@ def lista_cooperativa():
             flash(f"Error del servidor: {r.status_code}", "error")
             return render_template("crud/cooperativa.html", lista=[], usuario=usuario)
     except requests.exceptions.RequestException as e:
+        print("[lista_cooperativa] RequestException:", e)
         flash(f"Error de conexión: {str(e)}", "error")
         return render_template("crud/cooperativa/cooperativa.html", lista=[], usuario=usuario)
 
@@ -1959,7 +1983,7 @@ def crear_cooperativa():
             ruc = request.form.get("ruc")
             telefono = request.form.get("telefono")
             correo = request.form.get("correo_empresarial")
-            r_cooperativas = requests.get("http://localhost:8099/api/cooperativa/lista")
+            r_cooperativas = requests.get(f"{API_URL}/api/cooperativa/lista")
             cooperativas = r_cooperativas.json().get("cooperativas", [])
             for coop in cooperativas:
                 if coop["nombre_cooperativa"].lower() == nombre.lower():
@@ -1995,7 +2019,7 @@ def crear_cooperativa():
                 "telefono": telefono,
                 "correo_empresarial": correo,
             }
-            response = requests.post("http://localhost:8099/api/cooperativa/guardar", json=datos)
+            response = requests.post(f"{API_URL}/api/cooperativa/guardar", json=datos)
             if response.status_code == 200:
                 flash("Cooperativa creada exitosamente", "success")
                 return redirect(url_for("router.lista_cooperativa"))
@@ -2021,7 +2045,7 @@ def editar_cooperativa(id):
             ruc = request.form.get("ruc")
             telefono = request.form.get("telefono")
             correo = request.form.get("correo_empresarial")
-            r_cooperativas = requests.get("http://localhost:8099/api/cooperativa/lista")
+            r_cooperativas = requests.get(f"{API_URL}/api/cooperativa/lista")
             cooperativas = r_cooperativas.json().get("cooperativas", [])
             for coop in cooperativas:
                 if coop["id_cooperativa"] != id:
@@ -2093,7 +2117,7 @@ def editar_cooperativa(id):
                 "telefono": telefono,
                 "correo_empresarial": correo,
             }
-            response = requests.put("http://localhost:8099/api/cooperativa/actualizar", json=datos)
+            response = requests.put(f"{API_URL}/api/cooperativa/actualizar", json=datos)
             if response.status_code == 200:
                 flash("Cooperativa actualizada exitosamente", "success")
                 return redirect(url_for("router.lista_cooperativa"))
@@ -2104,7 +2128,7 @@ def editar_cooperativa(id):
             flash(f"Error: {str(e)}", "error")
             return redirect(url_for("router.lista_cooperativa"))
     try:
-        r = requests.get(f"http://localhost:8099/api/cooperativa/lista/{id}")
+        r = requests.get(f"{API_URL}/api/cooperativa/lista/{id}")
         if r.status_code == 200:
             cooperativa = r.json().get("cooperativa")
             return render_template(
@@ -2121,7 +2145,7 @@ def editar_cooperativa(id):
 @router.route("/cooperativa/eliminar/<int:id>", methods=["POST"])
 def eliminar_cooperativa(id):
     try:
-        r = requests.delete(f"http://localhost:8099/api/cooperativa/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/cooperativa/eliminar/{id}")
         if r.status_code == 200:
             flash("Cooperativa eliminada correctamente", "success")
         else:
@@ -2136,7 +2160,7 @@ def eliminar_cooperativa(id):
 @router.route("/cooperativa/ordenar/<atributo>/<orden>")
 def ordenar_cooperativa(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/cooperativa/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/cooperativa/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -2150,7 +2174,7 @@ def ordenar_cooperativa(atributo, orden):
 def buscar_cooperativa(atributo, criterio):
     try:
         response = requests.get(
-            f"http://localhost:8099/api/cooperativa/buscar/{atributo}/{criterio}"
+            f"{API_URL}/api/cooperativa/buscar/{atributo}/{criterio}"
         )
         if response.status_code == 200:
             return jsonify(response.json())
@@ -2163,27 +2187,31 @@ def buscar_cooperativa(atributo, criterio):
 
 
 # CRUD de Buses
-
-
 @router.route("/bus/lista")
-@requiere_administrador
+#@requiere_administrador
 def lista_bus():
+    print("Entrando a lista_bus admin de router") 
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/bus/lista")
+        r = requests.get(f"{API_URL}/api/bus/lista")
+        print("[lista_bus] status_code:", r.status_code)
+        print("[lista_bus] response text:", r.text)
         if r.status_code == 200:
             try:
                 data = r.json()
+                print("[lista_bus] data:", data)
                 return render_template(
                     "crud/bus/bus.html", lista=data.get("buses", []), usuario=usuario
                 )
             except json.JSONDecodeError as je:
+                print("[lista_bus] JSONDecodeError:", je)
                 flash("Error al decodificar la respuesta del servidor", "error")
                 return render_template("crud/bus/bus.html", lista=[], usuario=usuario)
         else:
             flash(f"Error del servidor: {r.status_code}", "error")
             return render_template("crud/bus/bus.html", lista=[], usuario=usuario)
     except requests.exceptions.RequestException as e:
+        print("[lista_bus] RequestException:", e)
         flash(f"Error de conexión: {str(e)}", "error")
         return render_template("crud/bus/bus.html", lista=[], usuario=usuario)
 
@@ -2193,9 +2221,9 @@ def lista_bus():
 def crear_bus():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/cooperativa/lista")
+        r = requests.get(f"{API_URL}/api/cooperativa/lista")
         cooperativas = r.json().get("cooperativas", []) if r.status_code == 200 else []
-        r_buses = requests.get("http://localhost:8099/api/bus/lista")
+        r_buses = requests.get(f"{API_URL}/api/bus/lista")
         buses = r_buses.json().get("buses", []) if r_buses.status_code == 200 else []
         ultimo_numero = max([bus.get("numero_bus", 0) for bus in buses], default=0)
         siguiente_numero = ultimo_numero + 1
@@ -2204,7 +2232,7 @@ def crear_bus():
         flash("Error al cargar las cooperativas", "error")
     if request.method == "POST":
         try:
-            r_buses = requests.get("http://localhost:8099/api/bus/lista")
+            r_buses = requests.get(f"{API_URL}/api/bus/lista")
             buses = r_buses.json().get("buses", [])
             numero = request.form.get("numero_bus")
             placa = request.form.get("placa")
@@ -2239,7 +2267,7 @@ def crear_bus():
                 "cooperativa_id": request.form["cooperativa_id"],
             }
             r = requests.post(
-                "http://localhost:8099/api/bus/guardar", headers=headers, json=data, timeout=5
+                f"{API_URL}/api/bus/guardar", headers=headers, json=data, timeout=5
             )
             if r.status_code == 200:
                 flash("Bus creado correctamente", "success")
@@ -2268,16 +2296,16 @@ def editar_bus(id):
     usuario = obtener_info_usuario()
     if request.method == "POST":
         try:
-            r_buses = requests.get("http://localhost:8099/api/bus/lista")
+            r_buses = requests.get(f"{API_URL}/api/bus/lista")
             buses = r_buses.json().get("buses", [])
             numero_bus = request.form["numero_bus"]
             placa = request.form["placa"].upper()
             for bus in buses:
                 if bus["id_bus"] != id:
                     if str(bus["numero_bus"]) == numero_bus:
-                        r = requests.get(f"http://localhost:8099/api/bus/lista/{id}")
+                        r = requests.get(f"{API_URL}/api/bus/lista/{id}")
                         bus_actual = r.json().get("bus")
-                        r_coop = requests.get("http://localhost:8099/api/cooperativa/lista")
+                        r_coop = requests.get(f"{API_URL}/api/cooperativa/lista")
                         cooperativas = r_coop.json().get("cooperativas", [])
                         return render_template(
                             "crud/bus/bus_editar.html",
@@ -2287,9 +2315,9 @@ def editar_bus(id):
                             error="El número de bus ya existe",
                         )
                     if bus["placa"].upper() == placa:
-                        r = requests.get(f"http://localhost:8099/api/bus/lista/{id}")
+                        r = requests.get(f"{API_URL}/api/bus/lista/{id}")
                         bus_actual = r.json().get("bus")
-                        r_coop = requests.get("http://localhost:8099/api/cooperativa/lista")
+                        r_coop = requests.get(f"{API_URL}/api/cooperativa/lista")
                         cooperativas = r_coop.json().get("cooperativas", [])
                         return render_template(
                             "crud/bus/bus_editar.html",
@@ -2310,7 +2338,7 @@ def editar_bus(id):
                 "estado_bus": request.form["estado_bus"],
                 "cooperativa_id": request.form["cooperativa_id"],
             }
-            r = requests.put("http://localhost:8099/api/bus/actualizar", headers=headers, json=data)
+            r = requests.put(f"{API_URL}/api/bus/actualizar", headers=headers, json=data)
             if r.status_code == 200:
                 flash("Bus actualizado correctamente", "success")
                 return redirect(url_for("router.lista_bus"))
@@ -2321,9 +2349,9 @@ def editar_bus(id):
             error_msg = f"Error de conexión: {str(e)}"
             flash(error_msg, "error")
     try:
-        r = requests.get(f"http://localhost:8099/api/bus/lista/{id}")
+        r = requests.get(f"{API_URL}/api/bus/lista/{id}")
         bus = r.json().get("bus") if r.status_code == 200 else None
-        r_coop = requests.get("http://localhost:8099/api/cooperativa/lista")
+        r_coop = requests.get(f"{API_URL}/api/cooperativa/lista")
         cooperativas = r_coop.json().get("cooperativas", []) if r_coop.status_code == 200 else []
         if bus:
             return render_template(
@@ -2340,7 +2368,7 @@ def editar_bus(id):
 @router.route("/bus/eliminar/<int:id>", methods=["POST"])
 def eliminar_bus(id):
     try:
-        r = requests.delete(f"http://localhost:8099/api/bus/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/bus/eliminar/{id}")
         if r.status_code == 200:
             flash("Bus eliminado correctamente", "success")
         else:
@@ -2354,7 +2382,7 @@ def eliminar_bus(id):
 @router.route("/bus/ordenar/<atributo>/<orden>")
 def ordenar_bus(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/bus/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/bus/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -2366,7 +2394,7 @@ def ordenar_bus(atributo, orden):
 @router.route("/bus/buscar/<atributo>/<criterio>")
 def buscar_bus(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/bus/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/bus/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -2382,7 +2410,7 @@ def buscar_bus(atributo, criterio):
 def lista_ruta():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/ruta/lista")
+        r = requests.get(f"{API_URL}/api/ruta/lista")
         if r.status_code == 200:
             try:
                 data = r.json()
@@ -2420,14 +2448,14 @@ def lista_ruta():
 def crear_ruta():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/bus/lista")
+        r = requests.get(f"{API_URL}/api/bus/lista")
         buses = r.json().get("buses", []) if r.status_code == 200 else []
     except:
         buses = []
         flash("Error al cargar los buses", "error")
     if request.method == "POST":
         try:
-            r_rutas = requests.get("http://localhost:8099/api/ruta/lista")
+            r_rutas = requests.get(f"{API_URL}/api/ruta/lista")
             rutas = r_rutas.json().get("rutas", [])
             origen = request.form["origen"]
             destino = request.form["destino"]
@@ -2469,7 +2497,7 @@ def crear_ruta():
                     }
                     data["escalas"].append(escala)
                 i += 1
-            r = requests.post("http://localhost:8099/api/ruta/guardar", headers=headers, json=data)
+            r = requests.post(f"{API_URL}/api/ruta/guardar", headers=headers, json=data)
             if r.status_code == 200:
                 flash("Ruta creada correctamente", "success")
                 return redirect(url_for("router.lista_ruta"))
@@ -2487,9 +2515,9 @@ def editar_ruta(id):
     usuario = obtener_info_usuario()
     if request.method == "GET":
         try:
-            r = requests.get(f"http://localhost:8099/api/ruta/lista/{id}")
+            r = requests.get(f"{API_URL}/api/ruta/lista/{id}")
             ruta = r.json().get("ruta") if r.status_code == 200 else None
-            r_bus = requests.get("http://localhost:8099/api/bus/lista")
+            r_bus = requests.get(f"{API_URL}/api/bus/lista")
             buses = r_bus.json().get("buses", []) if r_bus.status_code == 200 else []
             if ruta:
                 escalas = ruta.get("escalas", [])
@@ -2511,13 +2539,13 @@ def editar_ruta(id):
             return redirect(url_for("router.lista_ruta"))
     elif request.method == "POST":
         try:
-            r = requests.get(f"http://localhost:8099/api/ruta/lista/{id}")
+            r = requests.get(f"{API_URL}/api/ruta/lista/{id}")
             ruta_actual = r.json().get("ruta") if r.status_code == 200 else None
-            r_bus = requests.get("http://localhost:8099/api/bus/lista")
+            r_bus = requests.get(f"{API_URL}/api/bus/lista")
             buses = r_bus.json().get("buses", []) if r_bus.status_code == 200 else []
 
             if request.method == "POST":
-                r_rutas = requests.get("http://localhost:8099/api/ruta/lista")
+                r_rutas = requests.get(f"{API_URL}/api/ruta/lista")
                 rutas = r_rutas.json().get("rutas", [])
                 origen = request.form.get("origen", "").strip()
                 destino = request.form.get("destino", "").strip()
@@ -2566,7 +2594,7 @@ def editar_ruta(id):
             if escalas:
                 datos_ruta["escalas"] = escalas
             r = requests.put(
-                "http://localhost:8099/api/ruta/actualizar",
+                f"{API_URL}/api/ruta/actualizar",
                 headers={"Content-Type": "application/json"},
                 json=datos_ruta,
             )
@@ -2585,7 +2613,7 @@ def editar_ruta(id):
 @router.route("/ruta/eliminar/<int:id>", methods=["POST"])
 def eliminar_ruta(id):
     try:
-        r = requests.delete(f"http://localhost:8099/api/ruta/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/ruta/eliminar/{id}")
         if r.status_code == 200:
             flash("Ruta eliminada correctamente", "success")
         else:
@@ -2599,7 +2627,7 @@ def eliminar_ruta(id):
 @router.route("/ruta/ordenar/<atributo>/<orden>")
 def ordenar_ruta(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/ruta/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/ruta/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             rutas = response.json().get("rutas", [])
             for ruta in rutas:
@@ -2626,7 +2654,7 @@ def ordenar_ruta(atributo, orden):
 @router.route("/ruta/buscar/<atributo>/<criterio>")
 def buscar_ruta(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/ruta/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/ruta/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -2643,7 +2671,7 @@ def buscar_ruta(atributo, criterio):
 def lista_escala():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/escala/lista")
+        r = requests.get(f"{API_URL}/api/escala/lista")
         if r.status_code == 200:
             data = r.json()
             return render_template(
@@ -2668,7 +2696,7 @@ def crear_escala():
                 "tiempo": request.form["tiempo"],
             }
             r = requests.post(
-                "http://localhost:8099/api/escala/guardar", headers=headers, json=data, timeout=5
+                f"{API_URL}/api/escala/guardar", headers=headers, json=data, timeout=5
             )
             if r.status_code == 200:
                 flash("Escala creada correctamente", "success")
@@ -2683,7 +2711,7 @@ def crear_escala():
             error_msg = f"Error en la petición: {str(e)}"
             flash(error_msg, "error")
     try:
-        r = requests.get("http://localhost:8099/api/ruta/lista")
+        r = requests.get(f"{API_URL}/api/ruta/lista")
         rutas = r.json().get("rutas", []) if r.status_code == 200 else []
     except:
         rutas = []
@@ -2702,7 +2730,7 @@ def editar_escala(id):
                 "tiempo": request.form["tiempo"],
             }
             r = requests.put(
-                "http://localhost:8099/api/escala/actualizar",
+                f"{API_URL}/api/escala/actualizar",
                 headers={"Content-Type": "application/json"},
                 json=data,
             )
@@ -2714,7 +2742,7 @@ def editar_escala(id):
         except requests.exceptions.RequestException as e:
             flash(f"Error de conexión: {str(e)}", "error")
     try:
-        r = requests.get(f"http://localhost:8099/api/escala/lista/{id}")
+        r = requests.get(f"{API_URL}/api/escala/lista/{id}")
         escala = r.json().get("escala") if r.status_code == 200 else None
         if escala:
             return render_template("crud/escala/escala_editar.html", escala=escala, usuario=usuario)
@@ -2728,7 +2756,7 @@ def editar_escala(id):
 @router.route("/escala/eliminar/<int:id>", methods=["POST"])
 def eliminar_escala(id):
     try:
-        r = requests.delete(f"http://localhost:8099/api/escala/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/escala/eliminar/{id}")
         if r.status_code == 200:
             flash("Escala eliminada correctamente", "success")
             return redirect(url_for("router.lista_escala"))
@@ -2741,7 +2769,7 @@ def eliminar_escala(id):
 @router.route("/escala/ordenar/<atributo>/<orden>")
 def ordenar_escala(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/escala/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/escala/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -2753,7 +2781,7 @@ def ordenar_escala(atributo, orden):
 @router.route("/escala/buscar/<atributo>/<criterio>")
 def buscar_escala(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/escala/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/escala/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -2770,7 +2798,7 @@ def buscar_escala(atributo, criterio):
 def lista_horario():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/horario/lista")
+        r = requests.get(f"{API_URL}/api/horario/lista")
         if r.status_code == 200:
             data = r.json()
             return render_template(
@@ -2789,7 +2817,7 @@ def lista_horario():
 def crear_horario():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/ruta/lista")
+        r = requests.get(f"{API_URL}/api/ruta/lista")
         rutas = r.json().get("rutas", []) if r.status_code == 200 else []
     except:
         rutas = []
@@ -2799,7 +2827,7 @@ def crear_horario():
             hora_salida = request.form["hora_salida"]
             hora_llegada = request.form["hora_llegada"]
             ruta_id = int(request.form["ruta_id"])
-            r_horarios = requests.get("http://localhost:8099/api/horario/lista")
+            r_horarios = requests.get(f"{API_URL}/api/horario/lista")
             horarios = r_horarios.json().get("horarios", [])
             hora_salida_nueva = sum(x * int(t) for x, t in zip([60, 1], hora_salida.split(":")))
             hora_llegada_nueva = sum(x * int(t) for x, t in zip([60, 1], hora_llegada.split(":")))
@@ -2833,7 +2861,7 @@ def crear_horario():
                 "estado_horario": request.form["estado_horario"],
                 "ruta": {"id_ruta": ruta_id},
             }
-            response = requests.post("http://localhost:8099/api/horario/guardar", json=data)
+            response = requests.post(f"{API_URL}/api/horario/guardar", json=data)
             if response.status_code == 200:
                 flash("Horario creado correctamente", "success")
                 return redirect(url_for("router.lista_horario"))
@@ -2849,9 +2877,9 @@ def crear_horario():
 def editar_horario(id):
     usuario = obtener_info_usuario()
     try:
-        r = requests.get(f"http://localhost:8099/api/horario/lista/{id}")
+        r = requests.get(f"{API_URL}/api/horario/lista/{id}")
         horario = r.json().get("horario") if r.status_code == 200 else None
-        r_rutas = requests.get("http://localhost:8099/api/ruta/lista")
+        r_rutas = requests.get(f"{API_URL}/api/ruta/lista")
         rutas = r_rutas.json().get("rutas", []) if r_rutas.status_code == 200 else []
     except requests.exceptions.RequestException as e:
         flash(f"Error de conexión: {str(e)}", "error")
@@ -2861,7 +2889,7 @@ def editar_horario(id):
                 hora_salida = request.form["hora_salida"]
                 hora_llegada = request.form["hora_llegada"]
                 ruta_id = int(request.form["ruta_id"])
-                r_horarios = requests.get("http://localhost:8099/api/horario/lista")
+                r_horarios = requests.get(f"{API_URL}/api/horario/lista")
                 horarios = r_horarios.json().get("horarios", [])
                 hora_salida_nueva = sum(x * int(t) for x, t in zip([60, 1], hora_salida.split(":")))
                 hora_llegada_nueva = sum(
@@ -2902,7 +2930,7 @@ def editar_horario(id):
                         "ruta": {"id_ruta": ruta_id},
                     }
                     r = requests.put(
-                        "http://localhost:8099/api/horario/actualizar",
+                        f"{API_URL}/api/horario/actualizar",
                         headers={"Content-Type": "application/json"},
                         json=data,
                     )
@@ -2926,7 +2954,7 @@ def editar_horario(id):
 @router.route("/horario/eliminar/<int:id>", methods=["POST"])
 def eliminar_horario(id):
     try:
-        r = requests.delete(f"http://localhost:8099/api/horario/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/horario/eliminar/{id}")
         if r.status_code == 200:
             flash("Horario eliminado correctamente", "success")
         else:
@@ -2939,7 +2967,7 @@ def eliminar_horario(id):
 @router.route("/horario/ordenar/<atributo>/<orden>")
 def ordenar_horario(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/horario/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/horario/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -2952,7 +2980,7 @@ def ordenar_horario(atributo, orden):
 @router.route("/horario/buscar/<atributo>/<criterio>")
 def buscar_horario(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/horario/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/horario/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -2962,16 +2990,13 @@ def buscar_horario(atributo, criterio):
     except Exception as e:
         return jsonify({"error": f"Error en la búsqueda: {str(e)}"}), 500
 
-
 # CRUD de Turnos
-
-
 @router.route("/turno/lista")
 @requiere_administrador
 def lista_turno():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/turno/lista")
+        r = requests.get(f"{API_URL}/api/turno/lista")
         if r.status_code == 200:
             data = r.json()
             return render_template(
@@ -2990,9 +3015,9 @@ def lista_turno():
 def crear_turno():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/horario/lista")
+        r = requests.get(f"{API_URL}/api/horario/lista")
         horarios = r.json().get("horarios", []) if r.status_code == 200 else []
-        r_turno = requests.get("http://localhost:8099/api/turno/lista")
+        r_turno = requests.get(f"{API_URL}/api/turno/lista")
         turnos = r_turno.json().get("turnos", []) if r_turno.status_code == 200 else []
         ultimo_numero = 0
         for turno in turnos:
@@ -3031,7 +3056,7 @@ def crear_turno():
                 }
                 print("data", data)
                 r = requests.post(
-                    "http://localhost:8099/api/turno/guardar",
+                    f"{API_URL}/api/turno/guardar",
                     headers={"Content-Type": "application/json"},
                     json=data,
                 )
@@ -3052,14 +3077,13 @@ def crear_turno():
         flash(f"Error: {str(e)}", "error")
         return redirect(url_for("router.lista_turno"))
 
-
 @router.route("/turno/editar/<int:id>", methods=["GET", "POST"])
 @requiere_administrador
 def editar_turno(id):
     usuario = obtener_info_usuario()
     if request.method == "POST":
         try:
-            r_turnos = requests.get("http://localhost:8099/api/turno/lista")
+            r_turnos = requests.get(f"{API_URL}/api/turno/lista")
             turnos = r_turnos.json().get("turnos", [])
             numero_turno = int(request.form["numero_turno"])
             fecha_salida = request.form.get("fecha_salida")
@@ -3067,9 +3091,9 @@ def editar_turno(id):
             for turno in turnos:
                 if turno.get("numero_turno") == numero_turno and turno.get("id_turno") != id:
                     estados_turno = ["Disponible", "Cancelado", "Agotado"]
-                    r = requests.get(f"http://localhost:8099/api/turno/lista/{id}")
+                    r = requests.get(f"{API_URL}/api/turno/lista/{id}")
                     turno = r.json().get("turno") if r.status_code == 200 else None
-                    r_horarios = requests.get("http://localhost:8099/api/horario/lista")
+                    r_horarios = requests.get(f"{API_URL}/api/horario/lista")
                     horarios = (
                         r_horarios.json().get("horarios", [])
                         if r_horarios.status_code == 200
@@ -3093,9 +3117,9 @@ def editar_turno(id):
                         and turno.get("horario", {}).get("id_horario") == horario_id
                     ):
                         estados_turno = ["Disponible", "Cancelado", "Agotado"]
-                        r = requests.get(f"http://localhost:8099/api/turno/lista/{id}")
+                        r = requests.get(f"{API_URL}/api/turno/lista/{id}")
                         turno = r.json().get("turno") if r.status_code == 200 else None
-                        r_horarios = requests.get("http://localhost:8099/api/horario/lista")
+                        r_horarios = requests.get(f"{API_URL}/api/horario/lista")
                         horarios = (
                             r_horarios.json().get("horarios", [])
                             if r_horarios.status_code == 200
@@ -3120,7 +3144,7 @@ def editar_turno(id):
                 "horario": {"id_horario": horario_id},
             }
             r = requests.put(
-                "http://localhost:8099/api/turno/actualizar",
+                f"{API_URL}/api/turno/actualizar",
                 headers={"Content-Type": "application/json"},
                 json=data,
             )
@@ -3133,9 +3157,9 @@ def editar_turno(id):
             flash(f"Error de conexión: {str(e)}", "error")
     try:
         estados_turno = ["Disponible", "Cancelado", "Agotado"]
-        r = requests.get(f"http://localhost:8099/api/turno/lista/{id}")
+        r = requests.get(f"{API_URL}/api/turno/lista/{id}")
         turno = r.json().get("turno") if r.status_code == 200 else None
-        r_horarios = requests.get("http://localhost:8099/api/horario/lista")
+        r_horarios = requests.get(f"{API_URL}/api/horario/lista")
         horarios = r_horarios.json().get("horarios", []) if r_horarios.status_code == 200 else []
         if turno and turno.get("fecha_salida"):
             try:
@@ -3158,11 +3182,10 @@ def editar_turno(id):
         flash(f"Error de conexión: {str(e)}", "error")
         return redirect(url_for("router.lista_turno"))
 
-
 @router.route("/turno/eliminar/<int:id>", methods=["POST"])
 def eliminar_turno(id):
     try:
-        r = requests.delete(f"http://localhost:8099/api/turno/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/turno/eliminar/{id}")
         if r.status_code == 200:
             flash("Turno eliminado correctamente", "success")
         else:
@@ -3175,7 +3198,7 @@ def eliminar_turno(id):
 @router.route("/turno/ordenar/<atributo>/<orden>")
 def ordenar_turno(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/turno/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/turno/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -3184,11 +3207,10 @@ def ordenar_turno(atributo, orden):
     except Exception as e:
         return jsonify({"error": f"Error al ordenar boletos: {str(e)}"}), 500
 
-
 @router.route("/turno/buscar/<atributo>/<criterio>")
 def buscar_turno(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/turno/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/turno/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -3200,14 +3222,12 @@ def buscar_turno(atributo, criterio):
 
 
 # CRUD de Frecuencias
-
-
 @router.route("/frecuencia/lista")
 @requiere_administrador
 def lista_frecuencia():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/frecuencia/lista")
+        r = requests.get(f"{API_URL}/api/frecuencia/lista")
         if r.status_code == 200:
             data = r.json()
             return render_template(
@@ -3222,7 +3242,6 @@ def lista_frecuencia():
         flash(f"Error de conexión: {str(e)}", "error")
         return render_template("crud/frecuencia/frecuencia.html", lista=[], usuario=usuario)
 
-
 @router.route("/frecuencia/crear", methods=["GET", "POST"])
 @requiere_administrador
 def crear_frecuencia():
@@ -3236,7 +3255,7 @@ def crear_frecuencia():
                 "horario": {"id_horario": int(request.form["horario_id"])},
             }
             r = requests.post(
-                "http://localhost:8099/api/frecuencia/guardar",
+                f"{API_URL}/api/frecuencia/guardar",
                 headers={"Content-Type": "application/json"},
                 json=data,
             )
@@ -3248,7 +3267,7 @@ def crear_frecuencia():
         except requests.exceptions.RequestException as e:
             flash(f"Error de conexión: {str(e)}", "error")
     try:
-        r = requests.get("http://localhost:8099/api/horario/lista")
+        r = requests.get(f"{API_URL}/api/horario/lista")
         horarios = r.json().get("horarios", []) if r.status_code == 200 else []
     except:
         horarios = []
@@ -3256,7 +3275,6 @@ def crear_frecuencia():
     return render_template(
         "crud/frecuencia/frecuencia_crear.html", horarios=horarios, usuario=usuario
     )
-
 
 @router.route("/frecuencia/editar/<int:id>", methods=["GET", "POST"])
 @requiere_administrador
@@ -3272,7 +3290,7 @@ def editar_frecuencia(id):
                 "horario": {"id_horario": int(request.form["horario_id"])},
             }
             r = requests.put(
-                "http://localhost:8099/api/frecuencia/actualizar",
+                f"{API_URL}/api/frecuencia/actualizar",
                 headers={"Content-Type": "application/json"},
                 json=data,
             )
@@ -3284,9 +3302,9 @@ def editar_frecuencia(id):
         except requests.exceptions.RequestException as e:
             flash(f"Error de conexión: {str(e)}", "error")
     try:
-        r = requests.get(f"http://localhost:8099/api/frecuencia/lista/{id}")
+        r = requests.get(f"{API_URL}/api/frecuencia/lista/{id}")
         frecuencia = r.json().get("frecuencia") if r.status_code == 200 else None
-        r_horarios = requests.get("http://localhost:8099/api/horario/lista")
+        r_horarios = requests.get(f"{API_URL}/api/horario/lista")
         horarios = r_horarios.json().get("horarios", []) if r_horarios.status_code == 200 else []
         if frecuencia:
             return render_template(
@@ -3306,7 +3324,7 @@ def editar_frecuencia(id):
 @router.route("/frecuencia/eliminar/<int:id>", methods=["POST"])
 def eliminar_frecuencia(id):
     try:
-        r = requests.delete(f"http://localhost:8099/api/frecuencia/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/frecuencia/eliminar/{id}")
         if r.status_code == 200:
             flash("Frecuencia eliminada correctamente", "success")
         else:
@@ -3319,7 +3337,7 @@ def eliminar_frecuencia(id):
 @router.route("/frecuencia/ordenar/<atributo>/<orden>")
 def ordenar_frecuencia(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/frecuencia/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/frecuencia/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -3333,7 +3351,7 @@ def ordenar_frecuencia(atributo, orden):
 def buscar_frecuencia(atributo, criterio):
     try:
         response = requests.get(
-            f"http://localhost:8099/api/frecuencia/buscar/{atributo}/{criterio}"
+            f"{API_URL}/api/frecuencia/buscar/{atributo}/{criterio}"
         )
         if response.status_code == 200:
             return jsonify(response.json())
@@ -3344,16 +3362,13 @@ def buscar_frecuencia(atributo, criterio):
     except Exception as e:
         return jsonify({"error": f"Error en la búsqueda: {str(e)}"}), 500
 
-
 # CRUD de Personas
-
-
 @router.route("/persona/lista")
 @requiere_administrador
 def lista_persona():
     try:
         usuario = obtener_info_usuario()
-        r = requests.get("http://localhost:8099/api/persona/lista")
+        r = requests.get(f"{API_URL}/api/persona/lista")
         if r.status_code == 200:
             data = r.json()
             return render_template(
@@ -3373,7 +3388,7 @@ def crear_persona():
     usuario = obtener_info_usuario()
     if request.method == "POST":
         try:
-            r_personas = requests.get("http://localhost:8099/api/persona/lista")
+            r_personas = requests.get(f"{API_URL}/api/persona/lista")
             personas = r_personas.json().get("personas", [])
             numero_identificacion = request.form.get("numero_identificacion").strip()
             correo = request.form.get("correo").strip()
@@ -3469,7 +3484,7 @@ def crear_persona():
                         }
                     )
             r = requests.post(
-                "http://localhost:8099/api/persona/guardar",
+                f"{API_URL}/api/persona/guardar",
                 headers={"Content-Type": "application/json"},
                 json=data,
             )
@@ -3492,14 +3507,13 @@ def crear_persona():
         usuario=usuario,
     )
 
-
 @router.route("/persona/editar/<int:id>", methods=["GET", "POST"])
 @requiere_administrador
 def editar_persona(id):
     usuario = obtener_info_usuario()
     if request.method == "POST":
         try:
-            r_personas = requests.get("http://localhost:8099/api/persona/lista")
+            r_personas = requests.get(f"{API_URL}/api/persona/lista")
             personas = r_personas.json().get("personas", [])
             numero_identificacion = request.form.get("numero_identificacion").strip()
             correo = request.form.get("correo").strip()
@@ -3600,7 +3614,7 @@ def editar_persona(id):
                     metodo_pago["id_pago"] = int(request.form.get("metodo_pago[id_pago]"))
                 datos_actualizacion["metodo_pago"] = metodo_pago
             response = requests.put(
-                "http://localhost:8099/api/persona/actualizar", json=datos_actualizacion
+                f"{API_URL}/api/persona/actualizar", json=datos_actualizacion
             )
             if response.status_code == 200:
                 flash("Persona actualizada exitosamente", "success")
@@ -3610,7 +3624,7 @@ def editar_persona(id):
         except Exception as e:
             flash(f"Error: {str(e)}", "error")
     try:
-        r = requests.get(f"http://localhost:8099/api/persona/lista/{id}")
+        r = requests.get(f"{API_URL}/api/persona/lista/{id}")
         if r.status_code == 200:
             persona = r.json().get("persona")
             return render_template(
@@ -3637,11 +3651,10 @@ def editar_persona(id):
         flash(f"Error al cargar los datos: {str(e)}", "error")
         return redirect(url_for("router.lista_persona"))
 
-
 @router.route("/persona/eliminar/<int:id>", methods=["POST"])
 def eliminar_persona(id):
     try:
-        r = requests.delete(f"http://localhost:8099/api/persona/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/persona/eliminar/{id}")
         if r.status_code == 200:
             flash("Persona eliminada correctamente", "success")
         else:
@@ -3654,7 +3667,7 @@ def eliminar_persona(id):
 @router.route("/persona/ordenar/<atributo>/<orden>")
 def ordenar_persona(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/persona/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/persona/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -3667,7 +3680,7 @@ def ordenar_persona(atributo, orden):
 @router.route("/persona/buscar/<atributo>/<criterio>")
 def buscar_persona(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/persona/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/persona/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -3677,16 +3690,13 @@ def buscar_persona(atributo, criterio):
     except Exception as e:
         return jsonify({"error": f"Error en la búsqueda: {str(e)}"}), 500
 
-
 # CRUD de Cuenta
-
-
 @router.route("/cuenta/lista")
 @requiere_administrador
 def lista_cuenta():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/cuenta/lista")
+        r = requests.get(f"{API_URL}/api/cuenta/lista")
         if r.status_code == 200:
             data = r.json()
             return render_template(
@@ -3705,7 +3715,7 @@ def crear_cuenta():
     usuario = obtener_info_usuario()
     if request.method == "POST":
         try:
-            r_cuenta = requests.get("http://localhost:8099/api/cuenta/lista")
+            r_cuenta = requests.get(f"{API_URL}/api/cuenta/lista")
             cuentas = r_cuenta.json().get("cuentas", [])
             correo = request.form.get("correo")
             for cuenta in cuentas:
@@ -3728,7 +3738,7 @@ def crear_cuenta():
                 flash("Todos los campos son requeridos", "error")
                 return redirect(url_for("router.crear_cuenta"))
             r = requests.post(
-                "http://localhost:8099/api/cuenta/guardar",
+                f"{API_URL}/api/cuenta/guardar",
                 json=data,
                 headers={"Content-Type": "application/json"},
             )
@@ -3742,13 +3752,13 @@ def crear_cuenta():
             flash(f"Error de conexión: {str(e)}", "error")
             return redirect(url_for("router.crear_cuenta"))
     try:
-        r_tipos = requests.get("http://localhost:8099/api/cuenta/tipos")
+        r_tipos = requests.get(f"{API_URL}/api/cuenta/tipos")
         tipos = (
             r_tipos.json()["tipos_cuenta"]
             if r_tipos.status_code == 200
             else ["Administrador", "Cliente"]
         )
-        r_estados = requests.get("http://localhost:8099/api/cuenta/estados")
+        r_estados = requests.get(f"{API_URL}/api/cuenta/estados")
         estados = (
             r_estados.json()["estados_cuenta"]
             if r_estados.status_code == 200
@@ -3776,15 +3786,15 @@ def editar_cuenta(id):
     usuario = obtener_info_usuario()
     if request.method == "POST":
         try:
-            r_cuentas = requests.get("http://localhost:8099/api/cuenta/lista")
+            r_cuentas = requests.get(f"{API_URL}/api/cuenta/lista")
             cuentas = r_cuentas.json().get("cuentas", [])
             correo = request.form["correo"]
             for cuenta in cuentas:
                 if cuenta["id_cuenta"] != id and cuenta["correo"].lower() == correo.lower():
-                    r = requests.get(f"http://localhost:8099/api/cuenta/lista/{id}")
+                    r = requests.get(f"{API_URL}/api/cuenta/lista/{id}")
                     cuenta_actual = r.json().get("cuenta")
-                    r_tipos = requests.get("http://localhost:8099/api/cuenta/tipos")
-                    r_estados = requests.get("http://localhost:8099/api/cuenta/estados")
+                    r_tipos = requests.get(f"{API_URL}/api/cuenta/tipos")
+                    r_estados = requests.get(f"{API_URL}/api/cuenta/estados")
                     tipos = r_tipos.json().get("tipos_cuenta", ["Administrador", "Cliente"])
                     estados = r_estados.json().get("estados_cuenta", ["Activo", "Inactivo"])
                     return render_template(
@@ -3805,14 +3815,14 @@ def editar_cuenta(id):
             if request.form.get("contrasenia") and request.form["contrasenia"].strip():
                 data["contrasenia"] = request.form["contrasenia"]
             r = requests.put(
-                "http://localhost:8099/api/cuenta/actualizar",
+                f"{API_URL}/api/cuenta/actualizar",
                 json=data,
                 headers={"Content-Type": "application/json"},
             )
             if r.status_code == 200:
                 flash("Cuenta actualizada exitosamente", "success")
                 try:
-                    r_sync = requests.post("http://localhost:8099/api/cuenta/sincronizar")
+                    r_sync = requests.post(f"{API_URL}/api/cuenta/sincronizar")
                     if r_sync.status_code != 200:
                         flash("Advertencia: Error al sincronizar los datos", "warning")
                 except:
@@ -3826,18 +3836,18 @@ def editar_cuenta(id):
         except requests.exceptions.RequestException as e:
             flash(f"Error de conexión: {str(e)}", "error")
     try:
-        r_cuenta = requests.get(f"http://localhost:8099/api/cuenta/lista/{id}")
+        r_cuenta = requests.get(f"{API_URL}/api/cuenta/lista/{id}")
         if r_cuenta.status_code != 200:
             flash("Cuenta no encontrada", "error")
             return redirect(url_for("router.lista_cuenta"))
         cuenta = r_cuenta.json()["cuenta"]
-        r_tipos = requests.get("http://localhost:8099/api/cuenta/tipos")
+        r_tipos = requests.get(f"{API_URL}/api/cuenta/tipos")
         tipos = (
             r_tipos.json()["tipos_cuenta"]
             if r_tipos.status_code == 200
             else ["Administrador", "Cliente"]
         )
-        r_estados = requests.get("http://localhost:8099/api/cuenta/estados")
+        r_estados = requests.get(f"{API_URL}/api/cuenta/estados")
         estados = (
             r_estados.json()["estados_cuenta"]
             if r_estados.status_code == 200
@@ -3858,11 +3868,11 @@ def editar_cuenta(id):
 @router.route("/cuenta/eliminar/<int:id>", methods=["POST"])
 def eliminar_cuenta(id):
     try:
-        r_verificar = requests.get(f"http://localhost:8099/api/cuenta/lista/{id}")
+        r_verificar = requests.get(f"{API_URL}/api/cuenta/lista/{id}")
         if r_verificar.status_code != 200:
             flash("Cuenta no encontrada", "error")
             return redirect(url_for("router.lista_cuenta"))
-        r = requests.delete(f"http://localhost:8099/api/cuenta/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/cuenta/eliminar/{id}")
         if r.status_code == 200:
             flash("Cuenta eliminada exitosamente", "success")
         else:
@@ -3875,7 +3885,7 @@ def eliminar_cuenta(id):
 @router.route("/cuenta/ordenar/<atributo>/<orden>")
 def ordenar_cuentas(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/cuenta/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/cuenta/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -3889,7 +3899,7 @@ def ordenar_cuentas(atributo, orden):
 @router.route("/cuenta/buscar/<atributo>/<criterio>")
 def buscar_cuentas(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/cuenta/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/cuenta/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -3899,16 +3909,13 @@ def buscar_cuentas(atributo, criterio):
     except Exception as e:
         return jsonify({"error": f"Error en la búsqueda: {str(e)}"}), 500
 
-
 # CRUD de Pagos
-
-
 @router.route("/pago/lista")
 @requiere_administrador
 def lista_pago():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/pago/lista")
+        r = requests.get(f"{API_URL}/api/pago/lista")
         if r.status_code == 200:
             data = r.json()
             return render_template(
@@ -3920,7 +3927,6 @@ def lista_pago():
     except requests.exceptions.RequestException as e:
         flash(f"Error de conexión: {str(e)}", "error")
         return render_template("crud/pago/pago.html", lista=[], usuario=usuario)
-
 
 @router.route("/pago/crear", methods=["GET", "POST"])
 @requiere_administrador
@@ -3937,7 +3943,7 @@ def crear_pago():
                 "saldo": request.form.get("saldo"),
             }
             r = requests.post(
-                "http://localhost:8099/api/pago/guardar",
+                f"{API_URL}/api/pago/guardar",
                 json=data,
             )
             if r.status_code == 200:
@@ -3956,7 +3962,7 @@ def crear_pago():
             flash("Error en los datos ingresados", "error")
             return redirect(url_for("router.crear_pago"))
     try:
-        r = requests.get("http://localhost:8099/api/pago/opciones")
+        r = requests.get(f"{API_URL}/api/pago/opciones")
         metodos_pago = (
             r.json()["metodos_pago"]
             if r.status_code == 200
@@ -3989,7 +3995,7 @@ def editar_pago(id):
                 "saldo": float(request.form["saldo"]),
             }
             r = requests.put(
-                "http://localhost:8099/api/pago/actualizar",
+                f"{API_URL}/api/pago/actualizar",
                 json=data,
                 headers={"Content-Type": "application/json"},
             )
@@ -4005,12 +4011,12 @@ def editar_pago(id):
             flash(f"Error: {str(e)}", "error")
             return redirect(url_for("router.editar_pago", id=id))
     try:
-        r_pago = requests.get(f"http://localhost:8099/api/pago/lista/{id}")
+        r_pago = requests.get(f"{API_URL}/api/pago/lista/{id}")
         if r_pago.status_code != 200:
             flash("Método de pago no encontrado", "error")
             return redirect(url_for("router.lista_pago"))
         pago = r_pago.json()["pago"]
-        r_opciones = requests.get("http://localhost:8099/api/pago/opciones")
+        r_opciones = requests.get(f"{API_URL}/api/pago/opciones")
         metodos_pago = (
             r_opciones.json()["metodos_pago"]
             if r_opciones.status_code == 200
@@ -4027,7 +4033,7 @@ def editar_pago(id):
 @router.route("/pago/eliminar/<int:id>", methods=["POST"])
 def eliminar_pago(id):
     try:
-        r = requests.delete(f"http://localhost:8099/api/pago/eliminar/{id}")
+        r = requests.delete(f"{API_URL}/api/pago/eliminar/{id}")
         if r.status_code == 200:
             flash("Pago eliminado correctamente", "success")
         else:
@@ -4040,7 +4046,7 @@ def eliminar_pago(id):
 @router.route("/pago/ordenar/<atributo>/<orden>")
 def ordenar_pago(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/pago/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/pago/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -4053,7 +4059,7 @@ def ordenar_pago(atributo, orden):
 @router.route("/pago/buscar/<atributo>/<criterio>")
 def buscar_pago(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/pago/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/pago/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -4065,14 +4071,12 @@ def buscar_pago(atributo, criterio):
 
 
 # CRUD de Boletos
-
-
 @router.route("/boleto/lista")
 @requiere_administrador
 def lista_boleto():
     usuario = obtener_info_usuario()
     try:
-        response = requests.get(f"http://localhost:8099/api/boleto/lista")
+        response = requests.get(f"{API_URL}/api/boleto/lista")
         if response.status_code == 200:
             data = response.json()
             return render_template(
@@ -4103,7 +4107,7 @@ def crear_boleto():
                 "persona": {"id_persona": int(request.form.get("persona_id"))},
                 "turno": {"id_turno": int(request.form.get("turno_id"))},
             }
-            response = requests.post("http://localhost:8099/api/boleto/guardar", json=data)
+            response = requests.post(f"{API_URL}/api/boleto/guardar", json=data)
             if response.status_code == 200:
                 flash("Boleto(s) creado(s) exitosamente", "success")
                 return redirect(url_for("router.lista_boleto"))
@@ -4115,8 +4119,8 @@ def crear_boleto():
         except ValueError as e:
             flash(f"Error en los datos del formulario: {str(e)}", "danger")
     try:
-        personas_response = requests.get("http://localhost:8099/api/persona/lista")
-        turnos_response = requests.get("http://localhost:8099/api/turno/lista")
+        personas_response = requests.get(f"{API_URL}/api/persona/lista")
+        turnos_response = requests.get(f"{API_URL}/api/turno/lista")
         personas = (
             personas_response.json().get("personas", [])
             if personas_response.status_code == 200
@@ -4132,7 +4136,6 @@ def crear_boleto():
         flash(f"Error al cargar los datos: {str(e)}", "danger")
         return redirect(url_for("router.lista_boleto"))
 
-
 @router.route("/boleto/editar/<int:id>", methods=["GET", "POST"])
 @requiere_administrador
 def editar_boleto(id):
@@ -4147,7 +4150,7 @@ def editar_boleto(id):
                 "turno_id": int(request.form.get("turno_id")),
             }
             response = requests.put(
-                "http://localhost:8099/api/boleto/actualizar",
+                f"{API_URL}/api/boleto/actualizar",
                 json=data,
                 headers={"Content-Type": "application/json"},
             )
@@ -4162,9 +4165,9 @@ def editar_boleto(id):
             flash(f"Error: {str(e)}", "danger")
             return redirect(url_for("router.editar_boleto", id=id))
     try:
-        boleto_response = requests.get(f"http://localhost:8099/api/boleto/lista/{id}")
-        personas_response = requests.get("http://localhost:8099/api/persona/lista")
-        turnos_response = requests.get("http://localhost:8099/api/turno/lista")
+        boleto_response = requests.get(f"{API_URL}/api/boleto/lista/{id}")
+        personas_response = requests.get(f"{API_URL}/api/persona/lista")
+        turnos_response = requests.get(f"{API_URL}/api/turno/lista")
         boleto = boleto_response.json().get("boleto")
         estados_boleto = ["Vendido", "Reservado", "Disponible", "Cancelado"]
         if boleto_response.status_code == 200:
@@ -4190,7 +4193,7 @@ def editar_boleto(id):
 @router.route("/boleto/eliminar/<int:id>", methods=["POST"])
 def eliminar_boleto(id):
     try:
-        response = requests.delete(f"http://localhost:8099/api/boleto/eliminar/{id}")
+        response = requests.delete(f"{API_URL}/api/boleto/eliminar/{id}")
         if response.status_code == 200:
             flash("Boleto eliminado exitosamente", "success")
         else:
@@ -4203,7 +4206,7 @@ def eliminar_boleto(id):
 @router.route("/boleto/ordenar/<atributo>/<orden>")
 def ordenar_boletos(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/boleto/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/boleto/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -4216,7 +4219,7 @@ def ordenar_boletos(atributo, orden):
 @router.route("/boleto/buscar/<atributo>/<criterio>")
 def buscar_boletos(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/boleto/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/boleto/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (
@@ -4226,16 +4229,13 @@ def buscar_boletos(atributo, criterio):
     except Exception as e:
         return jsonify({"error": f"Error en la búsqueda: {str(e)}"}), 500
 
-
 # CRUD de Descuentos
-
-
 @router.route("/descuento/lista")
 @requiere_administrador
 def lista_descuento():
     usuario = obtener_info_usuario()
     try:
-        r = requests.get("http://localhost:8099/api/descuento/lista")
+        r = requests.get(f"{API_URL}/api/descuento/lista")
         if r.status_code == 200:
             descuentos = r.json().get("descuentos", [])
             return render_template(
@@ -4254,7 +4254,7 @@ def crear_descuento():
     usuario = obtener_info_usuario()
     if request.method == "POST":
         try:
-            r_descuento = requests.get("http://localhost:8099/api/descuento/lista")
+            r_descuento = requests.get(f"{API_URL}/api/descuento/lista")
             descuentos = r_descuento.json().get("descuentos", [])
             nombre_descuento = request.form.get("nombre_descuento")
             for descuento in descuentos:
@@ -4276,7 +4276,7 @@ def crear_descuento():
                 "fecha_inicio": datetime.now().strftime("%Y-%m-%d"),
                 "fecha_fin": (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d"),
             }
-            response = requests.post("http://localhost:8099/api/descuento/guardar", json=data)
+            response = requests.post(f"{API_URL}/api/descuento/guardar", json=data)
             if response.status_code == 200:
                 flash("Descuento creado exitosamente", "success")
                 return redirect(url_for("router.lista_descuento"))
@@ -4288,7 +4288,7 @@ def crear_descuento():
         except ValueError as e:
             flash(f"Error en los datos del formulario: {str(e)}", "danger")
     try:
-        descuento_response = requests.get("http://localhost:8099/api/descuento/estados")
+        descuento_response = requests.get(f"{API_URL}/api/descuento/estados")
         descuentos = (
             descuento_response.json().get("estados_descuento", [])
             if descuento_response.status_code == 200
@@ -4312,7 +4312,7 @@ def editar_descuento(id):
     estados_descuento = ["Activo", "Inactivo", "Expirado", "Agotado"]
     if request.method == "POST":
         try:
-            r_descuentos = requests.get("http://localhost:8099/api/descuento/lista")
+            r_descuentos = requests.get(f"{API_URL}/api/descuento/lista")
             descuentos = r_descuentos.json().get("descuentos", [])
             nombre_descuento = request.form.get("nombre_descuento")
             for descuento in descuentos:
@@ -4320,7 +4320,7 @@ def editar_descuento(id):
                     descuento["id_descuento"] != id
                     and descuento["nombre_descuento"].lower() == nombre_descuento.lower()
                 ):
-                    r = requests.get(f"http://localhost:8099/api/descuento/lista/{id}")
+                    r = requests.get(f"{API_URL}/api/descuento/lista/{id}")
                     descuento_actual = r.json().get("descuento")
                     return render_template(
                         "crud/descuento/descuento_editar.html",
@@ -4345,7 +4345,7 @@ def editar_descuento(id):
                 if fecha_fin:
                     fecha_fin_obj = datetime.strptime(fecha_fin, "%Y-%m-%d")
                     datos["fecha_fin"] = fecha_fin_obj.strftime("%d/%m/%Y")
-            r = requests.put("http://localhost:8099/api/descuento/actualizar", json=datos)
+            r = requests.put(f"{API_URL}/api/descuento/actualizar", json=datos)
             if r.status_code == 200:
                 flash("Descuento actualizado exitosamente", "success")
                 return redirect(url_for("router.lista_descuento"))
@@ -4355,7 +4355,7 @@ def editar_descuento(id):
         except Exception as e:
             flash(f"Error: {str(e)}", "error")
     try:
-        r = requests.get(f"http://localhost:8099/api/descuento/lista/{id}")
+        r = requests.get(f"{API_URL}/api/descuento/lista/{id}")
         if r.status_code == 200:
             descuento = r.json().get("descuento")
             return render_template(
@@ -4374,7 +4374,7 @@ def editar_descuento(id):
 @router.route("/descuento/eliminar/<int:id>", methods=["POST"])
 def eliminar_descuento(id):
     try:
-        response = requests.delete(f"http://localhost:8099/api/descuento/eliminar/{id}")
+        response = requests.delete(f"{API_URL}/api/descuento/eliminar/{id}")
         if response.status_code == 200:
             flash("Descuento eliminado exitosamente", "success")
         else:
@@ -4387,7 +4387,7 @@ def eliminar_descuento(id):
 @router.route("/descuento/ordenar/<atributo>/<orden>")
 def ordenar_descuento(atributo, orden):
     try:
-        response = requests.get(f"http://localhost:8099/api/descuento/ordenar/{atributo}/{orden}")
+        response = requests.get(f"{API_URL}/api/descuento/ordenar/{atributo}/{orden}")
         if response.status_code == 200:
             return jsonify(response.json())
         else:
@@ -4400,7 +4400,7 @@ def ordenar_descuento(atributo, orden):
 @router.route("/descuento/buscar/<atributo>/<criterio>")
 def buscar_descuento(atributo, criterio):
     try:
-        response = requests.get(f"http://localhost:8099/api/descuento/buscar/{atributo}/{criterio}")
+        response = requests.get(f"{API_URL}/api/descuento/buscar/{atributo}/{criterio}")
         if response.status_code == 200:
             return jsonify(response.json())
         return (

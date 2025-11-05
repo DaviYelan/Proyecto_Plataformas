@@ -106,7 +106,7 @@ public class Pago_api {
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @Secured(roles = {"ADMIN"})
+    //@Secured(roles = {"ADMIN"})
     public Response update(HashMap<String, Object> map) {
         HashMap<String, Object> response = new HashMap<>();
         try {

@@ -18,7 +18,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PUT;
 import javax.ws.rs.GET;
 
-@Secured(roles = {"ADMIN"})
+
+//@Secured(roles = {"ADMIN"})
 @Path("/cooperativa")
 public class Cooperativa_api {
 
@@ -29,6 +30,7 @@ public class Cooperativa_api {
         HashMap<String, Object> response = new HashMap<>();
         Controlador_cooperativa cc = new Controlador_cooperativa();
         response.put("msg", "Lista de cooperativas");
+        System.out.println("Cantidad de cooperativas: " + cc.Lista_cooperativas().getSize());
         response.put("cooperativas", cc.Lista_cooperativas().toArray());
         if (cc.Lista_cooperativas().isEmpty()) {
             response.put("cooperativas", new Object[] {});

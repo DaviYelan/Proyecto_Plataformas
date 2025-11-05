@@ -453,7 +453,7 @@
                 return true;
             }
             window.onload = function () {
-                fetch('http://localhost:8099/api/ruta/lista')
+                fetch('{API_URL}/api/ruta/lista')
                     .then(response => response.json())
                     .then(data => {
                         const origenes = new Set();
@@ -478,7 +478,7 @@
                             option.textContent = destino;
                             selectDestino.appendChild(option);
                         });
-                        fetch('http://localhost:8099/api/turno/lista')
+                        fetch('{API_URL}/api/turno/lista')
                             .then(response => response.json())
                             .then(data => {
                                 data.turnos.forEach(turno => {
