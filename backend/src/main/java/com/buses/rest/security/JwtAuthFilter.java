@@ -51,8 +51,9 @@ public class JwtAuthFilter implements ContainerRequestFilter {
             if (roles != null) {
                 for (String r : rolesAllowed) {
                     for (String u : roles) {
-                        if (r.equalsIgnoreCase(u) || r.equalsIgnoreCase(mapRole(u))) {
-                            match = true; break;
+                        if (normalize(r).equalsIgnoreCase(normalize(u))) {
+                            match = true;
+                            break;
                         }
                     }
                     if (match) break;
@@ -76,7 +77,7 @@ public class JwtAuthFilter implements ContainerRequestFilter {
             public boolean isUserInRole(String role) {
                 if (roles == null) return false;
                 for (String u : roles) {
-                    if (u.equalsIgnoreCase(role) || mapRole(u).equalsIgnoreCase(role)) return true;
+                    if (normalize(u).equalsIgnoreCase(normalize(role))) return true;
                 }
                 return false;
             }
@@ -96,10 +97,27 @@ public class JwtAuthFilter implements ContainerRequestFilter {
         requestContext.setProperty("claims", claims);
     }
 
-    private String mapRole(String role) {
-        // No normalizar, solo devolver el valor original en mayúsculas
+    // (mapRole removed in favor of normalize)
+
+    /**
+     * Normaliza un rol para comparaciones.
+     * Convierte variantes ("ADMIN", "Administrador", "administrador", "admin")
+     * a una forma canónica ("ADMIN"). Hace lo mismo para "Cliente" -> "CLIENTE".
+     */
+    private String normalize(String role) {
         if (role == null) return "";
-        return role;
+        String r = role.trim().toLowerCase();
+        if (r.isEmpty()) return "";
+        // admin variants
+        if (r.equals("admin") || r.equals("administrator") || r.equals("administrador") || r.contains("admin")) {
+            return "ADMIN";
+        }
+        // cliente / client variants
+        if (r.equals("cliente") || r.equals("client") || r.contains("client")) {
+            return "CLIENTE";
+        }
+        // fallback: uppercase to have predictable comparison
+        return role.toUpperCase();
     }
 
     private void abort(ContainerRequestContext ctx, Response.Status status, String msg) {

@@ -1,5 +1,4 @@
 package com.buses.rest.apis;
-
 import com.buses.rest.security.Secured;
 import controlador.servicios.Controlador_cooperativa;
 import controlador.tda.lista.LinkedList;
