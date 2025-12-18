@@ -14,6 +14,11 @@ interface ClientDashboardProps {
 const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogout, onGoHome }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'tickets' | 'payment-methods' | 'profile' | 'settings'>('overview');
   const [currentUserData, setCurrentUserData] = useState(user);
+
+  // Actualizar balance cuando el usuario cambia (desde App.tsx)
+  useEffect(() => {
+    setCurrentUserData(user);
+  }, [user.balance, user.email]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -76,11 +81,48 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
     }
   }, [backendPaymentMethod, user.paymentMethods]);
 
-  // Statistics Calculation usando datos del backend
+  // Combinar boletos del backend con los comprados en esta sesión (tickets prop)
+  const mappedPurchasedTickets = useMemo(() => {
+    return tickets.map((t) => {
+      // Convertir fecha de YYYY-MM-DD a DD/MM/YYYY si es necesario
+      let tripDateFormatted = t.tripDate || new Date(t.purchaseDate).toLocaleDateString('es-EC');
+      if (t.tripDate && t.tripDate.includes('-')) {
+        // Convertir YYYY-MM-DD a DD/MM/YYYY
+        const parts = t.tripDate.split('-');
+        tripDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      return {
+        id_boleto: Number(String(t.id).replace(/\D/g, '')) || Date.now(),
+        fecha_compra: new Date(t.purchaseDate).toLocaleDateString('es-EC'),
+        numero_asiento: parseInt(t.seats[0]?.number || '0'),
+        cantidad_boleto: t.seats.length,
+        precio_final: t.totalPrice,
+        estado_boleto: 'Pagado',
+        persona: { correo: user.email } as any,
+        turno: {
+          fecha_salida: tripDateFormatted,
+          horario: {
+            hora_salida: t.trip.departureTime,
+            ruta: {
+              origen: t.trip.origin,
+              destino: t.trip.destination,
+              bus: { cooperativa: { nombre_cooperativa: t.trip.operator } },
+            },
+          },
+        },
+      } as api.BoletoBackend;
+    });
+  }, [tickets, user.email]);
+
+  const displayTickets = useMemo(() => {
+    return [...boletosBackend, ...mappedPurchasedTickets];
+  }, [boletosBackend, mappedPurchasedTickets]);
+
+  // Statistics Calculation usando boletos combinados
   const stats = useMemo(() => {
-    const totalTrips = boletosBackend.length;
+    const totalTrips = displayTickets.length;
     const now = new Date();
-    const activeTickets = boletosBackend.filter(b => {
+    const activeTickets = displayTickets.filter(b => {
       if (b.turno?.fecha_salida) {
         const [day, month, year] = b.turno.fecha_salida.split('/');
         const tripDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
@@ -89,11 +131,9 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
       return true;
     });
     
-    // Encontrar próximo viaje
     const nextTrip = activeTickets.length > 0 ? activeTickets[0] : null;
     
-    // Calcular ruta favorita
-    const routes = boletosBackend.map(b => {
+    const routes = displayTickets.map(b => {
       if (b.turno?.horario?.ruta) {
         return `${b.turno.horario.ruta.origen} - ${b.turno.horario.ruta.destino}`;
       }
@@ -111,7 +151,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
       nextTrip,
       favoriteRoute 
     };
-  }, [boletosBackend]);
+  }, [displayTickets]);
 
   // Handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -389,7 +429,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
                         <h2 className="text-xl md:text-2xl font-bold text-white mb-4">Historial de Viajes</h2>
                         {loading ? (
                             <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2ecc71]"></div></div>
-                        ) : boletosBackend.length === 0 ? (
+                        ) : displayTickets.length === 0 ? (
                             <div className="bg-[#1e1e1e] rounded-xl p-12 text-center border border-gray-800">
                                 <h3 className="text-xl font-bold text-white mb-2">No tienes historial</h3>
                                 <p className="text-gray-500 mb-6">Tus viajes pasados y futuros aparecerán aquí.</p>
@@ -397,7 +437,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {boletosBackend.map((boleto) => (
+                                {displayTickets.map((boleto) => (
                                     <div key={boleto.id_boleto} className="bg-[#1e1e1e] rounded-xl border border-gray-800 shadow-md hover:border-[#2ecc71]/30 transition-all p-4 md:p-5 flex flex-col lg:flex-row justify-between gap-6">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-2"><span className="bg-[#2ecc71]/10 text-[#2ecc71] px-2 py-0.5 rounded text-xs font-bold border border-[#2ecc71]/20">{boleto.turno?.horario?.ruta?.bus?.cooperativa?.nombre_cooperativa || 'Operador'}</span><span className="text-gray-500 text-xs">#{boleto.id_boleto}</span></div>

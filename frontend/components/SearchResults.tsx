@@ -116,6 +116,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ results, searchParams, on
           onBack={() => setStep('seats')}
           onSuccess={handlePaymentSuccess}
           user={user}
+          tripDate={searchParams.departDate}
         />
       </div>
     );

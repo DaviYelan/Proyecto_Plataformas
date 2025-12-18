@@ -14,6 +14,7 @@ import Register from './components/Register';
 import AdminDashboard from './components/AdminDashboard';
 import ClientDashboard from './components/ClientDashboard';
 import { SearchParams, Trip, Ticket, User } from './types';
+import * as api from './services/apiService';
 
 // Mock Data for trips
 const MOCK_TRIPS: Trip[] = [
@@ -143,47 +144,50 @@ const App: React.FC = () => {
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
   const [purchasedTickets, setPurchasedTickets] = useState<Ticket[]>([]);
 
-  const handleSearch = (params: SearchParams) => {
-    // Basic filtering logic (Case insensitive)
-    const results = MOCK_TRIPS.filter(trip => 
-      trip.origin.toLowerCase().includes(params.origin.toLowerCase()) && 
-      trip.destination.toLowerCase().includes(params.destination.toLowerCase())
-    );
-
-    let finalResults = results;
-    if (finalResults.length === 0) {
-        if (params.origin.toLowerCase().includes('quito') || params.destination.toLowerCase().includes('guayaquil')) {
-           finalResults = MOCK_TRIPS.filter(t => t.origin === 'Quito' && t.destination === 'Guayaquil');
-        } else if (params.origin.toLowerCase().includes('puyo') || params.destination.toLowerCase().includes('zamora')) {
-           finalResults = MOCK_TRIPS.filter(t => t.origin === 'Puyo' && t.destination === 'Zamora');
-        } else {
-           finalResults = MOCK_TRIPS.slice(0, 3);
-        }
+  const handleSearch = async (params: SearchParams) => {
+    try {
+      // Buscar horarios disponibles desde el backend
+      const horarios = await api.searchTrips(params.origin, params.destination);
+      
+      // Mapear horarios a trips
+      const trips = horarios.map(api.mapHorario);
+      
+      setFilteredTrips(trips);
+      setCurrentSearchParams(params);
+      setIsSearchOpen(true);
+      closeAllModals();
+    } catch (error) {
+      console.error('Error buscando viajes:', error);
+      setFilteredTrips([]);
+      setCurrentSearchParams(params);
+      setIsSearchOpen(true);
+      closeAllModals();
     }
-    
-    setFilteredTrips(finalResults);
-    setCurrentSearchParams(params);
-    setIsSearchOpen(true);
-    closeAllModals();
   };
 
-  const handleDestinationSelect = (destination: string) => {
+  const handleDestinationSelect = async (destination: string) => {
     const params: SearchParams = {
-      origin: 'Quito',
+      origin: '',
       destination: destination,
       departDate: new Date().toISOString().split('T')[0],
       returnDate: '',
       isRoundTrip: false
     };
     
-    const results = MOCK_TRIPS.filter(t => t.destination.includes(destination));
-    setFilteredTrips(results.length > 0 ? results : MOCK_TRIPS.slice(0, 2));
-    setCurrentSearchParams(params);
-    setIsSearchOpen(true);
+    await handleSearch(params);
   };
 
   const handleTicketPurchased = (ticket: Ticket) => {
     setPurchasedTickets(prev => [ticket, ...prev]);
+    // Descontar del saldo del usuario
+    setCurrentUser(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        balance: (prev.balance || 0) - ticket.totalPrice
+      };
+    });
+    setView('client');
   };
 
   const closeAllModals = () => {
@@ -263,7 +267,9 @@ const App: React.FC = () => {
         if (data && data.authenticated && data.user) {
           const u = data.user;
           const role: User['role'] = (u.tipo_cuenta === 'Administrador') ? 'admin' : 'client';
-          const mappedUser: User = {
+
+          // Intentar enriquecer con datos completos (persona/metodo_pago)
+          let mappedUser: User = {
             id: String(u.id ?? ''),
             email: u.correo ?? '',
             role,
@@ -271,6 +277,36 @@ const App: React.FC = () => {
             name: u.nombre ?? 'Usuario',
             lastName: u.apellido ?? '',
           };
+
+          try {
+            const personaResp = await fetch('/api/persona/lista', { credentials: 'include' });
+            if (personaResp.ok) {
+              const personasData = await personaResp.json();
+              const personas = personasData.personas || [];
+              const persona = personas.find((p: any) => p.id_persona === u.id || p.cuenta?.correo === u.correo);
+              if (persona) {
+                const mp = persona.metodo_pago;
+                mappedUser = {
+                  ...mappedUser,
+                  phone: persona.telefono || mappedUser.phone,
+                  name: persona.nombre || mappedUser.name,
+                  lastName: persona.apellido || mappedUser.lastName,
+                  balance: persona.saldo_disponible ?? mappedUser.balance,
+                  paymentMethods: mp ? [{
+                    id: mp.id_pago,
+                    type: mp.opcion_pago === 'Tarjeta_credito' ? 'Tarjeta de Crédito' : mp.opcion_pago,
+                    holder: mp.titular,
+                    number: '**** **** **** ' + (mp.numero_tarjeta || '').slice(-4),
+                    expiry: mp.fecha_vencimiento,
+                    brand: 'visa',
+                  }] : [],
+                };
+              }
+            }
+          } catch (err) {
+            console.error('Error obteniendo persona:', err);
+          }
+
           setCurrentUser(mappedUser);
 
           if (path.startsWith('/administrador') && role === 'admin') {

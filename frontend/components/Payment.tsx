@@ -8,9 +8,10 @@ interface PaymentProps {
   onBack: () => void;
   onSuccess: (ticket: Ticket) => void;
   user: User | null;
+  tripDate?: string;
 }
 
-const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSuccess, user }) => {
+const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSuccess, user, tripDate }) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [passengerName, setPassengerName] = useState(user?.name ? `${user.name} ${user.lastName || ''}`.trim() : '');
@@ -46,7 +47,8 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
         seats: selectedSeats,
         purchaseDate: new Date().toISOString(),
         passengerName: passengerName || 'Pasajero',
-        totalPrice: totalPrice
+        totalPrice: totalPrice,
+        tripDate: tripDate || new Date().toISOString().split('T')[0]
       };
       setCreatedTicket(ticket);
     }, 2000);

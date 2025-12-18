@@ -72,6 +72,7 @@ export interface Ticket {
   purchaseDate: string;
   passengerName: string;
   totalPrice: number;
+  tripDate?: string;
 }
 
 export type UserRole = 'admin' | 'client' | 'guest';

@@ -523,3 +523,28 @@ export const mapPersona = (p: PersonaBackend): User => ({
   tariffType: p.tipo_tarifa as any,
   balance: p.saldo_disponible
 });
+
+// ========== BÚSQUEDA DE VIAJES ==========
+export const searchTrips = async (origin: string, destination: string): Promise<HorarioBackend[]> => {
+  try {
+    const horariosResp = await fetch(`${API_BASE}/api/horario/lista`);
+    const horariosData = await horariosResp.json();
+    const horarios: HorarioBackend[] = horariosData.horarios || [];
+    
+    // Filtrar horarios por origen y destino
+    const filtered = horarios.filter(h => {
+      const ruta = h.ruta;
+      if (!ruta) return false;
+      
+      const matchOrigin = !origin || ruta.origen.toLowerCase().includes(origin.toLowerCase());
+      const matchDestination = !destination || ruta.destino.toLowerCase().includes(destination.toLowerCase());
+      
+      return matchOrigin && matchDestination && h.estado_horario === 'Disponible';
+    });
+    
+    return filtered;
+  } catch (error) {
+    console.error('Error al buscar viajes:', error);
+    return [];
+  }
+};
