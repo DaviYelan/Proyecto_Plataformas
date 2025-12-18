@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, render_template, flash, redirect, request, session, url_for
+from flask import Blueprint, jsonify, render_template, flash, redirect, request, session, url_for, send_from_directory
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
@@ -90,9 +90,81 @@ def no_cache(view_function):
     return decorated_function
 
 
+# Gemini API configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+
+SYSTEM_PROMPT = """Eres un asistente de viajes experto de AventuraBus, una empresa de transporte terrestre en Ecuador. 
+Tu rol es ayudar a los usuarios con:
+- Información sobre rutas y destinos disponibles
+- Recomendaciones de viaje y turismo en Ecuador
+- Consejos para planificar viajes en bus
+- Información sobre horarios y frecuencias
+- Tips de seguridad y comodidad para viajes largos
+
+Responde siempre en español de manera amigable y profesional. Si te preguntan sobre precios específicos o disponibilidad, sugiere que consulten la sección de búsqueda de boletos."""
+
+
 @router.route("/")
 def home():
-    return render_template("index.html")
+    return send_from_directory(os.path.join(os.path.dirname(__file__), '../aventurabus_dist'), 'index.html')
+
+
+@router.route("/api/gemini/chat", methods=["POST"])
+def chat_with_gemini():
+    """Endpoint para chatear con Gemini AI"""
+    try:
+        data = request.get_json()
+        query = data.get("query", "")
+        
+        if not query:
+            return jsonify({"error": "No se proporcionó una consulta"}), 400
+        
+        if not GEMINI_API_KEY:
+            return jsonify({"error": "API key de Gemini no configurada"}), 500
+        
+        # Llamar a la API de Gemini
+        response = requests.post(
+            f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": f"{SYSTEM_PROMPT}\n\nPregunta del usuario: {query}"}]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "maxOutputTokens": 1024
+                }
+            },
+            timeout=30
+        )
+        
+        if response.status_code == 429:
+            return jsonify({
+                "error": "Cuota de API excedida. Por favor, intenta más tarde."
+            }), 429
+        
+        if not response.ok:
+            return jsonify({
+                "error": f"Error de la API de Gemini: {response.status_code}"
+            }), response.status_code
+        
+        result = response.json()
+        text = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+        
+        if not text:
+            text = "Lo siento, no pude generar una respuesta."
+        
+        return jsonify({"text": text})
+        
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "Tiempo de espera agotado"}), 504
+    except Exception as e:
+        print(f"Error en chat_with_gemini: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 def requiere_iniciar(f):
     @wraps(f)
@@ -149,15 +221,102 @@ def obtener_info_usuario():
 def verificar_sesion():
     return jsonify({"sesion_activa": "user" in session})
 
+@router.route("/api/session")
+def api_session():
+    """Endpoint para verificar la sesión del usuario desde React"""
+    if "user" not in session:
+        return jsonify({"authenticated": False, "user": None})
+    
+    user_data = session.get("user", {})
+    usuario_id = user_data.get("id")
+    
+    # Intentar obtener datos completos del usuario desde el backend
+    try:
+        if usuario_id:
+            response = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}", timeout=10)
+            if response.status_code == 200:
+                persona_data = response.json().get("persona", {})
+                return jsonify({
+                    "authenticated": True,
+                    "user": {
+                        "id": persona_data.get("id_persona"),
+                        "nombre": persona_data.get("nombre"),
+                        "apellido": persona_data.get("apellido"),
+                        "correo": persona_data.get("correo") or (persona_data.get("cuenta", {}) or {}).get("correo"),
+                        "tipo_cuenta": (persona_data.get("cuenta", {}) or {}).get("tipo_cuenta", "Cliente"),
+                        "tipo_identificacion": persona_data.get("tipo_identificacion"),
+                        "numero_identificacion": persona_data.get("numero_identificacion"),
+                        "fecha_nacimiento": persona_data.get("fecha_nacimiento"),
+                        "direccion": persona_data.get("direccion"),
+                        "telefono": persona_data.get("telefono"),
+                        "genero": persona_data.get("genero"),
+                        "tipo_tarifa": persona_data.get("tipo_tarifa"),
+                        "saldo_disponible": persona_data.get("saldo_disponible", 0)
+                    }
+                })
+    except Exception:
+        pass
+    
+    # Si falla obtener datos completos, devolver los datos de sesión
+    return jsonify({
+        "authenticated": True,
+        "user": {
+            "id": user_data.get("id"),
+            "nombre": user_data.get("nombre"),
+            "apellido": user_data.get("apellido"),
+            "correo": user_data.get("correo"),
+            "tipo_cuenta": user_data.get("tipo_cuenta", "Cliente"),
+            "saldo_disponible": 0
+        }
+    })
+
+@router.route("/resultados_cooperativas")
+def resultados_cooperativas():
+    """Página para mostrar cooperativas disponibles para una ruta específica"""
+    return send_from_directory(os.path.join(os.path.dirname(__file__), '../aventurabus_dist'), 'index.html')
+
+@router.route("/seleccionar_asientos")
+def seleccionar_asientos():
+    """Página para seleccionar asientos en un bus"""
+    return send_from_directory(os.path.join(os.path.dirname(__file__), '../aventurabus_dist'), 'index.html')
+
+@router.route("/api/turno/lista")
+def get_turnos():
+    """Obtener todos los turnos disponibles"""
+    try:
+        response = backend_request('GET', '/api/turno/lista')
+        if response.status_code == 200:
+            return jsonify(response.json())
+        return jsonify({"error": "Error al obtener turnos"}), response.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # Inicio de sesión
 @router.route("/iniciar_sesion", methods=["GET", "POST"])
 def iniciar_sesion():
+    # Detectar si es una petición JSON (desde React)
+    is_json_request = request.is_json or request.headers.get("Content-Type") == "application/json"
+    
     if "user" in session:
         try:
             print('[iniciar_sesion] user in session =', session.get('user'))
             print('[iniciar_sesion] tipo_cuenta =', session.get('user', {}).get('tipo_cuenta'))
         except Exception:
             pass
+        
+        # Si es petición JSON, devolver datos del usuario en sesión
+        if is_json_request:
+            user = session.get("user", {})
+            return jsonify({
+                "id": user.get("id"),
+                "nombre": user.get("nombre"),
+                "apellido": user.get("apellido"),
+                "correo": user.get("correo"),
+                "telefono": "",
+                "rol": "admin" if user.get("tipo_cuenta") == "Administrador" else "client",
+                "tipo_cuenta": user.get("tipo_cuenta"),
+            }), 200
+        
         redirect_url = session.pop("redirect_after_login", None)
         if redirect_url:
             try:
@@ -176,9 +335,27 @@ def iniciar_sesion():
         except Exception:
             pass
         return redirect(url_for("router.cliente"))
+    
+    # Servir el login React de busgo en GET
+    if request.method == "GET":
+        return send_from_directory(os.path.join(os.path.dirname(__file__), '../aventurabus_dist'), 'index.html')
+    
     if request.method == "POST":
-        correo = request.form.get("correo")
-        contrasenia = request.form.get("contrasenia")
+        # Obtener datos de JSON o form
+        if is_json_request:
+            data = request.get_json()
+            correo = data.get("correo") if data else None
+            contrasenia = data.get("contrasenia") if data else None
+        else:
+            correo = request.form.get("correo")
+            contrasenia = request.form.get("contrasenia")
+        
+        if not correo or not contrasenia:
+            if is_json_request:
+                return jsonify({"error": "Correo y contraseña son requeridos"}), 400
+            flash("Correo y contraseña son requeridos", "danger")
+            return redirect(url_for("router.iniciar_sesion"))
+        
         try:
             # Llamar al endpoint de autenticación del backend para validar credenciales y obtener token
             r = requests.post(f"{API_URL}/api/auth/login", json={"correo": correo, "contrasenia": contrasenia})
@@ -194,13 +371,27 @@ def iniciar_sesion():
                     persona = next((p for p in personas if p.get("cuenta", {}).get("correo") == correo), None)
                     if persona:
                         cuenta = persona.get("cuenta", {})
-                        session["user"] = {
+                        user_data = {
                             "id": persona.get("id_persona"),
                             "nombre": persona.get("nombre"),
                             "apellido": persona.get("apellido"),
                             "tipo_cuenta": cuenta.get("tipo_cuenta"),
                             "correo": cuenta.get("correo"),
                         }
+                        session["user"] = user_data
+                        
+                        # Si es petición JSON, devolver datos del usuario
+                        if is_json_request:
+                            return jsonify({
+                                "id": user_data.get("id"),
+                                "nombre": user_data.get("nombre"),
+                                "apellido": user_data.get("apellido"),
+                                "correo": user_data.get("correo"),
+                                "telefono": persona.get("telefono", ""),
+                                "rol": "admin" if cuenta.get("tipo_cuenta") == "Administrador" else "client",
+                                "tipo_cuenta": cuenta.get("tipo_cuenta"),
+                            }), 200
+                        
                         redirect_url = session.pop("redirect_after_login", None)
                         if redirect_url:
                             return redirect(redirect_url)
@@ -212,18 +403,26 @@ def iniciar_sesion():
                             return redirect(url_for("router.cliente"))
                 # fallback
                 session.pop("token", None)
+                if is_json_request:
+                    return jsonify({"error": "No se encontró la persona asociada a la cuenta"}), 404
                 flash("No se encontró la persona asociada a la cuenta", "danger")
                 return redirect(url_for("router.iniciar_sesion"))
             elif r.status_code == 423:
-                flash(r.json().get("mensaje", "Cuenta bloqueada"), "danger")
+                mensaje = r.json().get("mensaje", "Cuenta bloqueada")
+                if is_json_request:
+                    return jsonify({"mensaje": mensaje}), 423
+                flash(mensaje, "danger")
                 return redirect(url_for("router.iniciar_sesion"))
             else:
+                if is_json_request:
+                    return jsonify({"error": "Correo o contraseña incorrectos"}), 401
                 flash("Correo o contraseña incorrectos", "danger")
                 return redirect(url_for("router.iniciar_sesion"))
         except requests.exceptions.RequestException:
+            if is_json_request:
+                return jsonify({"error": "Error de conexión con el servidor"}), 500
             flash("Error de conexión", "danger")
             return redirect(url_for("router.iniciar_sesion"))
-    return render_template("iniciar_sesion.html")
 
 @router.route("/logout")
 def cerrar_sesion():
@@ -677,14 +876,13 @@ def google_callback():
                     session.pop("google_user", None)
                     flash("Cuenta creada e iniciada con Google", "success")
                     return redirect(url_for("router.cliente"))
-        # Si la creación falla, caer al flujo de registro para que el usuario complete datos
+        # Si la creación falla, intentar asociar por correo consultando la lista de personas
         else:
             try:
                 print('[google_callback] crear_resp.status=', crear_resp.status_code)
                 print('[google_callback] crear_resp.text =', crear_resp.text)
             except Exception:
                 pass
-            # Si la creación falló, intentar asociar por correo consultando la lista de personas
             try:
                 personas_resp = requests.get(f"{API_URL}/api/persona/lista", timeout=10)
                 if personas_resp.status_code == 200:
@@ -706,188 +904,125 @@ def google_callback():
                         flash('Cuenta existente asociada. Sesión iniciada.', 'success')
                         return redirect(url_for('router.cliente'))
             except Exception:
-                # Si falla la consulta, continuar al flujo de registro
+                # Si falla la consulta, continuar
                 pass
     except Exception:
-        # en caso de error, no bloquear el flujo: dejar que el usuario complete el registro manualmente
+        # en caso de error, no bloquear el flujo
         pass
-    session["user"] = {
-        "id": None,
-        "nombre": nombre or "Usuario",
-        "apellido": apellido or "",
-        "tipo_cuenta": "Cliente",
-        "correo": correo,
-    }
-    session["google_only"] = True
-    # Limpiar banderas relacionadas con registro desde Google
-    session.pop("from_google", None)
-    session.pop("google_correo", None)
-    session.pop("google_user", None)
-    flash("Inicio temporal permitido con Google. Completa tu perfil luego para persistir la cuenta.", "success")
-    return redirect(url_for("router.cliente"))
-
-@router.route("/auth/google/receive", methods=["GET", "POST"])
-def google_receive():
-    return google_callback()
-
-@router.route('/auth/google/complete', methods=['POST'])
-def google_complete_registration():
-    """Crear permanentemente la persona en el backend usando los datos de sesión (cuando vino desde Google).
-    Este endpoint lo llama el frontend cuando el usuario pulsa 'Completar registro' desde el panel cliente.
-    """
-    # Solo permitir si venimos de un inicio temporal
-    if not session.get('google_only') or not session.get('user'):
-        return jsonify({'success': False, 'message': 'No hay un inicio temporal activo'}), 400
-    user = session.get('user', {})
-    correo = user.get('correo')
-    nombre = user.get('nombre')
-    apellido = user.get('apellido')
-    # Leer datos enviados desde el frontend (esperamos fecha_nacimiento en formato YYYY-MM-DD)
-    payload = request.get_json(silent=True) or {}
-    fecha_input = payload.get('fecha_nacimiento')
-    # Si no se proporciona fecha, usar un placeholder razonable para permitir creación rápida (opción B)
-    if not fecha_input:
-        # Fecha por defecto (YYYY-MM-DD). Cambiar si prefieres otra fecha placeholder.
-        fecha_input = '1990-01-01'
-        placeholder_used = True
-    else:
-        placeholder_used = False
-    # Convertir a formato dd/mm/YYYY (formato que usa el backend)
+    
+    # Si llegamos aquí sin haber iniciado sesión, crear la persona automáticamente sin intervención
     try:
-        parts = fecha_input.split('-')
-        fecha_formatted = f"{parts[2]}/{parts[1]}/{parts[0]}"
-    except Exception:
-        fecha_formatted = ""
-
-    # Generar campos mínimos para crear la persona en el backend
-    generated_password = secrets.token_urlsafe(12)
-    generated_id = f"google_{int(time.time())}{secrets.token_hex(4)}"
-    datos_registro = {
-        "tipo_identificacion": "Cedula",
-        "numero_identificacion": generated_id,
-        "nombre": nombre or "",
-        "apellido": apellido or "",
-        "fecha_nacimiento": fecha_formatted,
-        "correo": correo,
-        "genero": "No_definido",
-        "direccion": "",
-        "telefono": payload.get('telefono', ""),
-        "saldo_disponible": 0.0,
-        "usuario": correo,
-        "contrasenia": generated_password,
-        "tipo_tarifa": "General",
-        "tipo_cuenta": "Cliente",
-        "estado_cuenta": "Activo",
-    }
-    try:
-        crear_resp = requests.post(f"{API_URL}/api/persona/guardar", json=datos_registro, timeout=10)
-    except requests.exceptions.RequestException as e:
+        generated_password = secrets.token_urlsafe(12)
+        generated_id = f"google_{int(time.time())}{secrets.token_hex(4)}"
+        datos_registro = {
+            "tipo_identificacion": "Cedula",
+            "numero_identificacion": generated_id,
+            "nombre": nombre or "Usuario",
+            "apellido": apellido or "",
+            "fecha_nacimiento": "01/01/1990",
+            "correo": correo,
+            "genero": "No_definido",
+            "direccion": "",
+            "telefono": "",
+            "saldo_disponible": 0.0,
+            "usuario": correo,
+            "contrasenia": generated_password,
+            "tipo_tarifa": "General",
+            "tipo_cuenta": "Cliente",
+            "estado_cuenta": "Activo",
+        }
         try:
-            print('[google_complete_registration] exception=', repr(e))
+            print('[google_callback] Intentando crear persona automáticamente con datos:', datos_registro)
         except Exception:
             pass
-        return jsonify({'success': False, 'message': 'Error conectando con backend'}), 500
-
-    if crear_resp.status_code != 200:
-        # retornar el texto de error si lo hay
-        texto = None
-        try:
-            texto = crear_resp.text
-        except Exception:
-            texto = str(crear_resp.status_code)
-        try:
-            print('[google_complete_registration] crear_resp.status=', crear_resp.status_code)
-            print('[google_complete_registration] crear_resp.text=', texto)
-        except Exception:
-            pass
-        return jsonify({'success': False, 'message': f'Error creando cuenta: {texto}'}), 400
-
-    # Buscar la persona recién creada e iniciar sesión (obtener id y token si es posible)
-    try:
-        # Primero intentar leer la respuesta de creación por si el backend devuelve el objeto creado
-        created_info = None
-        try:
-            created_info = crear_resp.json()
+        crear_resp = requests.post(
+            f"{API_URL}/api/persona/guardar",
+            headers={"Content-Type": "application/json"},
+            json=datos_registro,
+            timeout=10,
+        )
+        if crear_resp.status_code == 200:
+            # Intentar obtener el id de la persona creada
+            persona_id = None
             try:
-                print('[google_complete_registration] crear_resp.json() =', created_info)
-            except Exception:
-                pass
-        except Exception:
-            created_info = None
-
-        # If backend returned the created persona (or id), use it directly
-        if created_info:
-            # buscar claves comunes
-            cid = None
-            if isinstance(created_info, dict):
-                cid = created_info.get('id_persona') or created_info.get('id') or (created_info.get('persona') or {}).get('id_persona')
-                nombre_resp = created_info.get('nombre') or (created_info.get('persona') or {}).get('nombre')
-                apellido_resp = created_info.get('apellido') or (created_info.get('persona') or {}).get('apellido')
-                correo_resp = created_info.get('correo') or (created_info.get('persona') or {}).get('correo')
-            else:
-                cid = None
-
-            if cid:
-                # Tenemos id, construir sesión persistente
-                session['user'] = {
-                    'id': cid,
-                    'nombre': nombre_resp or nombre or '',
-                    'apellido': apellido_resp or apellido or '',
-                    'tipo_cuenta': 'Cliente',
-                    'correo': correo_resp or correo,
-                }
-                session.pop('google_only', None)
-                # intentar login para obtener token
+                # Intentar buscar la persona recién creada por correo
+                personas_resp = requests.get(f"{API_URL}/api/persona/lista", timeout=10)
+                if personas_resp.status_code == 200:
+                    personas = personas_resp.json().get("personas", [])
+                    persona = next((p for p in personas if (p.get("correo") or (p.get("cuenta", {}) or {}).get("correo")) == correo), None)
+                    if persona:
+                        persona_id = persona.get("id_persona")
+                        cuenta = persona.get("cuenta", {})
+                        session["user"] = {
+                            "id": persona_id,
+                            "nombre": persona.get("nombre") or nombre or "Usuario",
+                            "apellido": persona.get("apellido") or apellido or "",
+                            "tipo_cuenta": cuenta.get("tipo_cuenta", "Cliente"),
+                            "correo": cuenta.get("correo") or correo,
+                        }
+                        # intentar login para obtener token
+                        try:
+                            login_resp = requests.post(
+                                f"{API_URL}/api/auth/login",
+                                json={"correo": correo, "contrasenia": generated_password},
+                                timeout=10,
+                            )
+                            if login_resp.status_code == 200:
+                                login_data = login_resp.json()
+                                token = login_data.get("token") or login_data.get("access_token")
+                                if token:
+                                    session["token"] = token
+                        except Exception:
+                            pass
+                        # limpiar marcas
+                        session.pop('from_google', None)
+                        session.pop('google_correo', None)
+                        session.pop('google_user', None)
+                        session.pop('google_only', None)
+                        flash("Cuenta creada automáticamente con Google", "success")
+                        return redirect(url_for("router.cliente"))
+            except Exception as e:
                 try:
-                    login_resp = requests.post(f"{API_URL}/api/auth/login", json={'correo': correo, 'contrasenia': generated_password}, timeout=10)
-                    if login_resp.status_code == 200:
-                        token = login_resp.json().get('token') or login_resp.json().get('access_token')
-                        if token:
-                            session['token'] = token
+                    print(f'[google_callback] Error obteniendo id de persona: {e}')
                 except Exception:
                     pass
-                return jsonify({'success': True, 'message': 'Cuenta creada correctamente'})
-
-        # Si no se obtuvo id del cuerpo de creación, intentar login automático con la contraseña generada
-        try:
-            login_resp = requests.post(f"{API_URL}/api/auth/login", json={'correo': correo, 'contrasenia': generated_password}, timeout=10)
-        except Exception as e:
+            
+            # Si no se pudo obtener el id, crear sesión temporal
+            session["user"] = {
+                "id": None,
+                "nombre": nombre or "Usuario",
+                "apellido": apellido or "",
+                "tipo_cuenta": "Cliente",
+                "correo": correo,
+            }
+            # intentar login para obtener token
             try:
-                print('[google_complete_registration] login attempt exception=', repr(e))
+                login_resp = requests.post(
+                    f"{API_URL}/api/auth/login",
+                    json={"correo": correo, "contrasenia": generated_password},
+                    timeout=10,
+                )
+                if login_resp.status_code == 200:
+                    login_data = login_resp.json()
+                    token = login_data.get("token") or login_data.get("access_token")
+                    if token:
+                        session["token"] = token
             except Exception:
                 pass
-            login_resp = None
-
-        if login_resp and login_resp.status_code == 200:
-            token = login_resp.json().get('token') or login_resp.json().get('access_token')
-            if token:
-                session['token'] = token
-                try:
-                    personas_resp = backend_request('GET', '/api/persona/lista')
-                    if personas_resp.status_code == 200:
-                        personas = personas_resp.json().get('personas', [])
-                        persona = next((p for p in personas if (p.get('correo') or (p.get('cuenta', {}) or {}).get('correo')) == correo), None)
-                        if persona:
-                            cuenta = persona.get('cuenta', {})
-                            session['user'] = {
-                                'id': persona.get('id_persona'),
-                                'nombre': persona.get('nombre'),
-                                'apellido': persona.get('apellido'),
-                                'tipo_cuenta': cuenta.get('tipo_cuenta') or 'Cliente',
-                                'correo': cuenta.get('correo') or correo,
-                            }
-                            session.pop('google_only', None)
-                            return jsonify({'success': True, 'message': 'Cuenta creada correctamente'})
-                except Exception:
-                    pass
-        try:
-            print('[google_complete_registration] Created but could not confirm persona in lista. crear_resp.text=', crear_resp.text)
-        except Exception:
-            pass
-        return jsonify({'success': True, 'message': 'Cuenta creada (no se pudo confirmar)'}), 200
+            # limpiar marcas
+            session.pop('from_google', None)
+            session.pop('google_correo', None)
+            session.pop('google_user', None)
+            session.pop('google_only', None)
+            flash("Cuenta creada automáticamente con Google", "success")
+            return redirect(url_for("router.cliente"))
     except Exception:
         pass
-    return jsonify({'success': True, 'message': 'Cuenta creada (no se pudo confirmar)'}), 200
+    
+    # Si todo falla, mostrar error
+    flash("Error creando la cuenta con Google. Por favor intenta nuevamente.", "danger")
+    return redirect(url_for("router.iniciar_sesion"))
+
 
 # Recuperacion de contraseña
 @router.route("/recuperar-contrasenia", methods=["GET", "POST"])
@@ -1091,143 +1226,9 @@ def cliente():
     # Si Google redirige directamente a /cliente con ?code=..., manejar el callback aquí
     if request.args.get("code") or request.args.get("error"):
         return google_callback()
-
-    try:
-        try:
-            print('[cliente] session[user] at entry =', session.get('user'))
-        except Exception:
-            pass
-        usuario_id = session.get("user", {}).get("id")
-        # Si el usuario fue autenticado temporalmente vía Google (google_only), no requerimos
-        # que exista un id en el backend; mostraremos la vista cliente con los datos en sesión.
-        if not usuario_id and not session.get("google_only"):
-            flash("Debe iniciar sesión", "warning")
-            return redirect(url_for("router.iniciar_sesion"))
-        persona_data = {}
-        if session.get("google_only"):
-            # Construir persona temporal a partir de session['user']
-            persona_data = {
-                "nombre": session.get("user", {}).get("nombre", "Usuario"),
-                "apellido": session.get("user", {}).get("apellido", ""),
-                "correo": session.get("user", {}).get("correo"),
-                "saldo_disponible": 0.0,
-            }
-        else:
-            response_persona = backend_request('GET', f"/api/persona/lista/{usuario_id}")
-            if response_persona.status_code != 200:
-                try:
-                    print(f"[cliente] /api/persona/lista/{usuario_id} status=", response_persona.status_code)
-                    print("[cliente] /api/persona/lista response=", response_persona.text)
-                except Exception:
-                    pass
-                flash("Error al obtener datos del usuario", "error")
-                return redirect(url_for("router.iniciar_sesion"))
-            persona_data = response_persona.json().get("persona", {})
-        response_boletos = backend_request('GET', f"/api/boleto/lista")
-        if response_boletos.status_code != 200:
-            try:
-                print(f"[cliente] /api/boleto/lista status=", response_boletos.status_code)
-                print("[cliente] /api/boleto/lista response=", response_boletos.text)
-            except Exception:
-                pass
-            boletos = []
-        else:
-            boletos = response_boletos.json().get("boletos", [])
-        boletos_usuario = [
-            b for b in boletos if b.get("persona", {}).get("id_persona") == usuario_id
-        ]
-        fecha_actual = datetime.now()
-        viajes_realizados = []
-        boletos_activos = []
-        for boleto in boletos_usuario:
-            try:
-                fecha_salida = datetime.strptime(
-                    boleto.get("turno", {}).get("fecha_salida", ""), "%d/%m/%Y"
-                )
-                if fecha_salida < fecha_actual:
-                    viajes_realizados.append(boleto)
-                elif boleto.get("estado_boleto") == "Vendido":
-                    boletos_activos.append(boleto)
-            except ValueError:
-                continue
-        stats = {
-            "viajes_realizados": len(viajes_realizados),
-            "destinos_visitados": len(
-                {
-                    b.get("turno", {}).get("horario", {}).get("ruta", {}).get("destino")
-                    for b in viajes_realizados
-                    if b
-                }
-            ),
-            "boletos_activos": len(boletos_activos),
-            "rutas_favoritas": len(
-                {
-                    b.get("turno", {}).get("horario", {}).get("ruta", {}).get("id_ruta")
-                    for b in boletos_usuario
-                    if b.get("estado_boleto") == "Vendido"
-                }
-            ),
-        }
-        historial_viajes = []
-        proximos_viajes = []
-        for b in boletos_usuario:
-            try:
-                fecha_salida = datetime.strptime(b.get("turno", {}).get("fecha_salida"), "%d/%m/%Y")
-                datos_viaje = {
-                    "fecha_compra": b.get("fecha_compra"),
-                    "fecha_salida": b.get("turno", {}).get("fecha_salida"),
-                    "hora_salida": b.get("turno", {}).get("horario", {}).get("hora_salida"),
-                    "destino": f"{b.get('turno', {}).get('horario', {}).get('ruta', {}).get('origen')} - "
-                    f"{b.get('turno', {}).get('horario', {}).get('ruta', {}).get('destino')}",
-                    "precio_unitario": b.get("turno", {})
-                    .get("horario", {})
-                    .get("ruta", {})
-                    .get("precio_unitario"),
-                    "distancia": b.get("turno", {})
-                    .get("horario", {})
-                    .get("ruta", {})
-                    .get("distancia"),
-                    "numero_asiento": b.get("numero_asiento"),
-                    "bus_numero": b.get("turno", {})
-                    .get("horario", {})
-                    .get("ruta", {})
-                    .get("bus", {})
-                    .get("numero_bus"),
-                    "cooperativa": b.get("turno", {})
-                    .get("horario", {})
-                    .get("ruta", {})
-                    .get("bus", {})
-                    .get("cooperativa", {})
-                    .get("nombre_cooperativa"),
-                    "estado": b.get("estado_boleto"),
-                    "precio_final": b.get("precio_final"),
-                    "id": b.get("id_boleto"),
-                }
-                if fecha_salida < fecha_actual:
-                    historial_viajes.append(datos_viaje)
-                else:
-                    if b.get("estado_boleto") == "Vendido":
-                        proximos_viajes.append(datos_viaje)
-            except Exception as e:
-                continue
-        proximos_viajes = sorted(
-            proximos_viajes, key=lambda x: datetime.strptime(x["fecha_salida"], "%d/%m/%Y")
-        )
-        usuario = {
-            "nombre": persona_data.get("nombre", "Usuario"),
-            "apellido": persona_data.get("apellido", ""),
-            "saldo_disponible": persona_data.get("saldo_disponible", 0.0),
-        }
-        return render_template(
-            "panel_cliente.html",
-            stats=stats,
-            historial_viajes=historial_viajes,
-            proximos_viajes=proximos_viajes,
-            usuario=usuario,
-        )
-    except Exception as e:
-        flash(f"Error al cargar el dashboard: {str(e)}", "danger")
-        return redirect(url_for("router.iniciar_sesion"))
+    
+    # Servir la aplicación React - el dashboard se maneja en el frontend
+    return send_from_directory(os.path.join(os.path.dirname(__file__), '../aventurabus_dist'), 'index.html')
 
 
 @router.route("/administrador")
@@ -1236,315 +1237,9 @@ def administrador():
     if session.get("user", {}).get("tipo_cuenta") != "Administrador":
         flash("Acceso no autorizado", "danger")
         return redirect(url_for("router.cliente"))
-    try:
-        usuario_id = session.get("user", {}).get("id")
-        r_usuario = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}")
-        datos_usuario = r_usuario.json().get("persona", {}) if r_usuario.status_code == 200 else {}
-        usuario = {
-            "nombre": datos_usuario.get("nombre", "Usuario"),
-            "apellido": datos_usuario.get("apellido", ""),
-        }
-        r_personas = requests.get(f"{API_URL}/api/persona/lista")
-        r_boletos = requests.get(f"{API_URL}/api/boleto/lista")
-        r_turnos = requests.get(f"{API_URL}/api/turno/lista")
-        r_rutas = requests.get(f"{API_URL}/api/ruta/lista")
-        personas = r_personas.json().get("personas", [])
-        boletos = r_boletos.json().get("boletos", [])
-        turnos = r_turnos.json().get("turnos", [])
-        rutas = r_rutas.json().get("rutas", [])
-        rutas = []
-        buses = []
-        rutas_ids = set()
-        buses_ids = set()
-        for ruta in rutas:
-            bus = ruta.get("bus", {})
-            if bus and bus.get("id_bus") not in buses_ids:
-                buses_ids.add(bus.get("id_bus"))
-                buses.append(bus)
-        for turno in turnos:
-            horario = turno.get("horario", {})
-            ruta = horario.get("ruta", {})
-            bus = ruta.get("bus", {})
-            if ruta and ruta.get("id_ruta") not in rutas_ids:
-                rutas_ids.add(ruta.get("id_ruta"))
-                rutas.append(ruta)
-            if bus and bus.get("id_bus") not in buses_ids:
-                buses_ids.add(bus.get("id_bus"))
-                buses.append(bus)
-        stats = {
-            "total_usuarios": len(personas),
-            "total_ventas": len(boletos),
-            "total_buses": len(buses),
-            "total_rutas": len(rutas),
-            "ingresos_totales": sum(float(b.get("precio_final", 0)) for b in boletos),
-            "viajes_activos": len([t for t in turnos if t.get("estado_turno") == "Activo"]),
-        }
-        usuarios = [
-            {
-                "id": p.get("id_persona"),
-                "nombre": f"{p.get('nombre', '')} {p.get('apellido', '')}",
-                "correo": p.get("correo"),
-                "tipo": p.get("cuenta", {}).get("tipo_cuenta", "Cliente"),
-                "estado": (
-                    "Activo" if p.get("cuenta", {}).get("estado_cuenta") == "Activo" else "Inactivo"
-                ),
-                "estado_clase": (
-                    "success" if p.get("cuenta", {}).get("estado_cuenta") == "Activo" else "danger"
-                ),
-            }
-            for p in personas
-        ]
-        boletos_lista = [
-            {
-                "id": b.get("id_boleto"),
-                "cliente": f"{b.get('persona', {}).get('nombre', '')} {b.get('persona', {}).get('apellido', '')}",
-                "asiento": f"{b.get('numero_asiento')}",
-                "ruta": f"{b.get('turno', {}).get('horario', {}).get('ruta', {}).get('origen')} - {b.get('turno', {}).get('horario', {}).get('ruta', {}).get('destino')}",
-                "fecha": b.get("fecha_compra"),
-                "bus": b.get("turno", {})
-                .get("horario", {})
-                .get("ruta", {})
-                .get("bus", {})
-                .get("placa"),
-                "precio": b.get("precio_final"),
-                "estado": b.get("estado_boleto", "No disponible"),
-                "estado_clase": "success" if b.get("estado_boleto") == "Vendido" else "warning",
-            }
-            for b in boletos
-        ]
-        buses_lista = [
-            {
-                "numero": b.get("numero_bus"),
-                "placa": b.get("placa"),
-                "marca": b.get("marca"),
-                "modelo": b.get("modelo"),
-                "cooperativa": b.get("cooperativa", {}).get("nombre_cooperativa"),
-                "estado": b.get("estado_bus"),
-                "estado_clase": "success" if b.get("estado_bus") == "Activo" else "warning",
-                "ruta_actual": next(
-                    (
-                        f"{r.get('origen')} - {r.get('destino')}"
-                        for r in rutas
-                        if r.get("bus", {}).get("id_bus") == b.get("id_bus")
-                        and r.get("estado_ruta") == "Disponible"
-                    ),
-                    "Sin ruta asignada",
-                ),
-            }
-            for b in buses
-        ]
-        rutas_lista = [
-            {
-                "origen": r.get("origen"),
-                "destino": r.get("destino"),
-                "bus_asignado": f"{r.get('bus', {}).get('numero_bus')} - {r.get('bus', {}).get('placa')}",
-                "horarios": ", ".join(
-                    set(
-                        t.get("horario", {}).get("hora_salida", "")
-                        for t in turnos
-                        if t.get("horario", {}).get("ruta", {}).get("id_ruta") == r.get("id_ruta")
-                    )
-                ),
-                "estado": r.get("estado_ruta"),
-                "estado_clase": "success" if r.get("estado_ruta") == "Disponible" else "warning",
-            }
-            for r in rutas
-        ]
-        ultimas_ventas = sorted(boletos_lista, key=lambda x: x["fecha"], reverse=True)[:25]
-        proximas_salidas = [
-            {
-                "ruta": f"{t.get('horario', {}).get('ruta', {}).get('origen')} - {t.get('horario', {}).get('ruta', {}).get('destino')}",
-                "hora": t.get("horario", {}).get("hora_salida"),
-                "bus": t.get("horario", {}).get("ruta", {}).get("bus", {}).get("numero_bus"),
-                "asientos_disponibles": t.get("horario", {})
-                .get("ruta", {})
-                .get("bus", {})
-                .get("capacidad_pasajeros", 0)
-                - len(
-                    [b for b in boletos if b.get("turno", {}).get("id_turno") == t.get("id_turno")]
-                ),
-            }
-            for t in sorted(turnos, key=lambda x: x.get("fecha_salida", ""))[:5]
-        ]
-        estado_buses = []
-        for b in buses:
-            turnos_bus = [
-                t
-                for t in turnos
-                if t.get("horario", {}).get("ruta", {}).get("bus", {}).get("id_bus")
-                == b.get("id_bus")
-            ]
-            estado = "En servicio" if turnos_bus else "Disponible"
-            estado_buses.append(
-                {
-                    "id": b.get("id_bus"),
-                    "numero": b.get("numero_bus"),
-                    "placa": b.get("placa"),
-                    "estado": estado,
-                    "estado_clase": "success" if estado == "En servicio" else "info",
-                    "ruta": (
-                        f"{turnos_bus[0].get('horario', {}).get('ruta', {}).get('origen')} - {turnos_bus[0].get('horario', {}).get('ruta', {}).get('destino')}"
-                        if turnos_bus
-                        else "Sin ruta asignada"
-                    ),
-                }
-            )
-        return render_template(
-            "panel_administrador.html",
-            stats=stats,
-            usuarios=usuarios,
-            boletos=boletos_lista,
-            buses=buses_lista,
-            rutas=rutas_lista,
-            estado_buses=estado_buses,
-            usuario=usuario,
-            ultimas_ventas=ultimas_ventas,
-            proximas_salidas=proximas_salidas,
-        )
-    except Exception as e:
-        flash(f"Error al cargar los datos: {str(e)}", "danger")
-        return render_template("panel_administrador.html", usuario=usuario)
-
-
-# Metodos generales
-
-
-@router.route("/api/metodos-pago/agregar", methods=["POST"])
-@requiere_iniciar
-def agregar_metodo_pago():
-    try:
-        usuario_id = session.get("user", {}).get("id")
-        if not usuario_id:
-            return jsonify({"error": "Usuario no autenticado"}), 401
-        r_usuario = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}")
-        if r_usuario.status_code != 200:
-            return jsonify({"error": "Error al obtener datos del usuario"}), 500
-        datos_actuales = r_usuario.json().get("persona", {})
-        metodo_pago = {
-            "opcion_pago": request.json.get("opcion_pago"),
-            "titular": request.json.get("titular"),
-            "numero_tarjeta": request.json.get("numero_tarjeta"),
-            "fecha_vencimiento": request.json.get("fecha_vencimiento"),
-            "codigo_seguridad": request.json.get("codigo_seguridad"),
-            "saldo": request.json.get("saldo"),
-        }
-        datos_actualizacion = {
-            "id_persona": usuario_id,
-            "tipo_identificacion": datos_actuales.get("tipo_identificacion"),
-            "numero_identificacion": datos_actuales.get("numero_identificacion"),
-            "nombre": datos_actuales.get("nombre"),
-            "apellido": datos_actuales.get("apellido"),
-            "direccion": datos_actuales.get("direccion"),
-            "fecha_nacimiento": datos_actuales.get("fecha_nacimiento"),
-            "telefono": datos_actuales.get("telefono"),
-            "correo": datos_actuales.get("correo"),
-            "genero": datos_actuales.get("genero"),
-            "tipo_tarifa": datos_actuales.get("tipo_tarifa", "General"),
-            "saldo_disponible": datos_actuales.get("saldo_disponible", 0.0),
-            "cuenta": datos_actuales.get("cuenta"),
-            "metodo_pago": metodo_pago,
-        }
-        response = requests.put(
-            f"{API_URL}/api/persona/actualizar", json=datos_actualizacion
-        )
-        if response.status_code == 500:
-            verify_response = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}")
-            if verify_response.status_code == 200:
-                persona_actualizada = verify_response.json().get("persona", {})
-                if persona_actualizada.get("metodo_pago"):
-                    return jsonify(
-                        {"success": True, "message": "Método de pago agregado correctamente"}
-                    )
-        return jsonify({"success": True, "message": "Método de pago agregado correctamente"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@router.route("/api/metodos-pago/actualizar", methods=["PUT"])
-@requiere_iniciar
-def actualizar_metodo_pago():
-    try:
-        data = request.get_json()
-        usuario_id = data.get("id_persona")
-        if not usuario_id:
-            return jsonify({"success": False, "message": "ID de usuario no proporcionado"}), 401
-        r_usuario = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}")
-        if r_usuario.status_code != 200:
-            return jsonify({"success": False, "message": "Error al obtener datos del usuario"}), 400
-        datos_actuales = r_usuario.json().get("persona", {})
-        metodo_pago = {
-            "opcion_pago": data.get("opcion_pago"),
-            "numero_tarjeta": data.get("numero_tarjeta"),
-            "titular": data.get("titular"),
-            "fecha_vencimiento": data.get("fecha_vencimiento"),
-            "codigo_seguridad": data.get("codigo_seguridad"),
-            "saldo": float(data.get("saldo", 0.0)),
-        }
-        datos_actualizacion = {
-            "id_persona": usuario_id,
-            "tipo_identificacion": datos_actuales.get("tipo_identificacion"),
-            "numero_identificacion": datos_actuales.get("numero_identificacion"),
-            "nombre": datos_actuales.get("nombre"),
-            "apellido": datos_actuales.get("apellido"),
-            "direccion": datos_actuales.get("direccion"),
-            "fecha_nacimiento": datos_actuales.get("fecha_nacimiento"),
-            "telefono": datos_actuales.get("telefono"),
-            "correo": datos_actuales.get("correo"),
-            "genero": datos_actuales.get("genero"),
-            "tipo_tarifa": datos_actuales.get("tipo_tarifa", "General"),
-            "saldo_disponible": datos_actuales.get("saldo_disponible", 0.0),
-            "cuenta": datos_actuales.get("cuenta"),
-            "metodo_pago": metodo_pago,
-        }
-        response = requests.put(
-            f"{API_URL}/api/persona/actualizar", json=datos_actualizacion
-        )
-        if response.status_code == 200:
-            return jsonify({"success": True, "message": "Método de pago actualizado correctamente"})
-        return jsonify({"success": False, "message": "Error al actualizar el método de pago"}), 400
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
-
-
-@router.route("/api/metodos-pago/eliminar", methods=["DELETE"])
-@requiere_iniciar
-def eliminar_metodo_pago():
-    try:
-        data = request.get_json()
-        usuario_id = data.get("id_persona")
-        if not usuario_id:
-            return jsonify({"success": False, "message": "ID de usuario no proporcionado"}), 400
-        r_usuario = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}")
-        if r_usuario.status_code != 200:
-            return jsonify({"success": False, "message": "Error al obtener datos del usuario"}), 400
-        datos_actuales = r_usuario.json().get("persona", {})
-        datos_actualizacion = {
-            "id_persona": usuario_id,
-            "tipo_identificacion": datos_actuales.get("tipo_identificacion"),
-            "numero_identificacion": datos_actuales.get("numero_identificacion"),
-            "nombre": datos_actuales.get("nombre"),
-            "apellido": datos_actuales.get("apellido"),
-            "direccion": datos_actuales.get("direccion"),
-            "fecha_nacimiento": datos_actuales.get("fecha_nacimiento"),
-            "telefono": datos_actuales.get("telefono"),
-            "correo": datos_actuales.get("correo"),
-            "genero": datos_actuales.get("genero"),
-            "tipo_tarifa": datos_actuales.get("tipo_tarifa", "General"),
-            "saldo_disponible": datos_actuales.get("saldo_disponible", 0.0),
-            "cuenta": datos_actuales.get("cuenta"),
-            "metodo_pago": None,
-        }
-        response = requests.put(
-            f"{API_URL}/api/persona/actualizar", json=datos_actualizacion
-        )
-        if response.status_code == 200:
-            if datos_actuales.get("metodo_pago", {}).get("id_pago"):
-                pago_id = datos_actuales["metodo_pago"]["id_pago"]
-                requests.delete(f"{API_URL}/api/pago/eliminar/{pago_id}")
-            return jsonify({"success": True, "message": "Método de pago eliminado correctamente"})
-        return jsonify({"success": False, "message": "Error al eliminar el método de pago"}), 400
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+    
+    # Servir la aplicación React - el dashboard de admin se maneja en el frontend
+    return send_from_directory(os.path.join(os.path.dirname(__file__), '../aventurabus_dist'), 'index.html')
 
 # Funciones de pago
 @router.route("/procesar_pago", methods=["GET", "POST"])
@@ -4457,6 +4152,311 @@ def single_blog():
     return render_template("single.html")
 
 
+# Servir API para rutas disponibles
+@router.route("/api/rutas")
+def get_rutas():
+    """Obtener todas las rutas disponibles para el formulario de búsqueda"""
+    try:
+        import json
+        ruta_json_path = os.path.join(os.path.dirname(__file__), '../../data/Ruta.json')
+        with open(ruta_json_path, 'r', encoding='utf-8') as f:
+            rutas = json.load(f)
+        return jsonify(rutas)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Servir assets compilados de vite (aventurabus y busgo)
+@router.route("/assets/<path:filename>")
+def serve_react_assets(filename):
+    """Servir assets compilados de React desde aventurabus_dist/assets"""
+    base_dir = os.path.dirname(__file__)
+    dist_path = os.path.join(base_dir, "../aventurabus_dist/assets")
+
+    file_path = os.path.join(dist_path, filename)
+    if os.path.exists(file_path):
+        return send_from_directory(dist_path, filename)
+
+    return {"error": "Asset not found"}, 404
+
+
+
+# Servir index.css
+@router.route("/index.css")
+def serve_index_css():
+    """Servir index.css desde dist"""
+    aventurabus_dist_path = os.path.join(os.path.dirname(__file__), '../aventurabus_dist')
+    css_file = os.path.join(aventurabus_dist_path, 'index.css')
+    
+    if os.path.exists(css_file):
+        return send_from_directory(aventurabus_dist_path, 'index.css')
+    
+    return {"error": "CSS file not found"}, 404
+
+@router.route("/img/<path:filename>")
+def serve_images(filename):
+    """Servir imágenes desde aventurabus_dist/img/"""
+    aventurabus_dist_path = os.path.join(os.path.dirname(__file__), '../aventurabus_dist')
+    file_path = os.path.join(aventurabus_dist_path, 'img', filename)
+    
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_from_directory(os.path.join(aventurabus_dist_path, 'img'), filename)
+    
+    return {"error": f"Image {filename} not found"}, 404
+
+
+@router.route("/<path:filename>")
+def serve_static_files(filename):
+    """Servir archivos estáticos desde aventurabus_dist"""
+    dist_path = os.path.join(os.path.dirname(__file__), "../aventurabus_dist")
+
+    file_path = os.path.join(dist_path, filename)
+
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_from_directory(dist_path, filename)
+
+    return {"error": f"File {filename} not found"}, 404
+
+
 @router.route("/testimonial.html")
 def testimonials():
     return render_template("testimonial.html")
+
+
+# ============================================
+# APIs para el Dashboard del Cliente (React)
+# ============================================
+
+@router.route("/api/cliente/dashboard")
+@requiere_iniciar
+def api_cliente_dashboard():
+    """Obtiene todos los datos del dashboard del cliente: usuario, boletos, estadísticas"""
+    try:
+        usuario_id = session.get("user", {}).get("id")
+        if not usuario_id:
+            return jsonify({"error": "Usuario no autenticado"}), 401
+        
+        # Obtener datos del usuario
+        r_usuario = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}", timeout=10)
+        usuario_data = {}
+        if r_usuario.status_code == 200:
+            persona = r_usuario.json().get("persona", {})
+            cuenta = persona.get("cuenta", {}) or {}
+            metodo_pago = persona.get("metodo_pago")
+            
+            usuario_data = {
+                "id": persona.get("id_persona"),
+                "nombre": persona.get("nombre", ""),
+                "apellido": persona.get("apellido", ""),
+                "correo": persona.get("correo") or cuenta.get("correo", ""),
+                "tipo_cuenta": cuenta.get("tipo_cuenta", "Cliente"),
+                "tipo_identificacion": persona.get("tipo_identificacion", ""),
+                "numero_identificacion": persona.get("numero_identificacion", ""),
+                "fecha_nacimiento": persona.get("fecha_nacimiento", ""),
+                "direccion": persona.get("direccion", ""),
+                "telefono": persona.get("telefono", ""),
+                "genero": persona.get("genero", ""),
+                "tipo_tarifa": persona.get("tipo_tarifa", "General"),
+                "saldo_disponible": float(persona.get("saldo_disponible", 0)),
+                "metodo_pago": metodo_pago
+            }
+        
+        # Obtener boletos del usuario
+        boletos_usuario = []
+        try:
+            r_boletos = requests.get(f"{API_URL}/api/boleto/lista", timeout=10)
+            if r_boletos.status_code == 200:
+                todos_boletos = r_boletos.json().get("boletos", [])
+                # Filtrar boletos del usuario actual
+                for boleto in todos_boletos:
+                    persona_boleto = boleto.get("persona", {}) or {}
+                    if persona_boleto.get("id_persona") == usuario_id:
+                        turno = boleto.get("turno", {}) or {}
+                        horario = turno.get("horario", {}) or {}
+                        frecuencia = horario.get("frecuencia", {}) or {}
+                        ruta = frecuencia.get("ruta", {}) or {}
+                        bus = turno.get("bus", {}) or {}
+                        cooperativa = bus.get("cooperativa", {}) or {}
+                        
+                        boleto_formateado = {
+                            "id": str(boleto.get("id_boleto", "")),
+                            "fecha_compra": boleto.get("fecha_compra", ""),
+                            "asiento": boleto.get("numero_asiento", 0),
+                            "precio": float(boleto.get("precio_unitario", 0)),
+                            "origen": ruta.get("origen", ""),
+                            "destino": ruta.get("destino", ""),
+                            "hora_salida": horario.get("hora_salida", ""),
+                            "hora_llegada": horario.get("hora_llegada", ""),
+                            "fecha_salida": frecuencia.get("fecha_salida", ""),
+                            "operador": cooperativa.get("nombre_cooperativa", ""),
+                            "bus_placa": bus.get("placa", ""),
+                            "distancia": ruta.get("distancia_km", 0),
+                            "estado": "Activo"
+                        }
+                        boletos_usuario.append(boleto_formateado)
+        except Exception as e:
+            print(f"Error obteniendo boletos: {e}")
+        
+        # Calcular estadísticas
+        total_viajes = len(boletos_usuario)
+        destinos = set(b.get("destino", "") for b in boletos_usuario if b.get("destino"))
+        destinos_visitados = len(destinos)
+        
+        # Boletos activos (fechas futuras)
+        from datetime import datetime
+        hoy = datetime.now()
+        boletos_activos = 0
+        for b in boletos_usuario:
+            try:
+                fecha_str = b.get("fecha_salida", "")
+                if fecha_str:
+                    fecha = datetime.strptime(fecha_str, "%d/%m/%Y")
+                    if fecha >= hoy:
+                        boletos_activos += 1
+            except:
+                pass
+        
+        # Ruta favorita
+        rutas_count = {}
+        for b in boletos_usuario:
+            ruta_key = f"{b.get('origen', '')} - {b.get('destino', '')}"
+            rutas_count[ruta_key] = rutas_count.get(ruta_key, 0) + 1
+        ruta_favorita = max(rutas_count, key=rutas_count.get) if rutas_count else "Ninguna"
+        
+        estadisticas = {
+            "viajes_realizados": total_viajes,
+            "destinos_visitados": destinos_visitados,
+            "boletos_activos": boletos_activos,
+            "rutas_favoritas": len(rutas_count),
+            "ruta_favorita": ruta_favorita
+        }
+        
+        return jsonify({
+            "success": True,
+            "usuario": usuario_data,
+            "boletos": boletos_usuario,
+            "estadisticas": estadisticas
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@router.route("/api/cliente/perfil/actualizar", methods=["PUT"])
+@requiere_iniciar
+def api_actualizar_perfil_cliente():
+    """Actualiza el perfil del cliente desde React"""
+    try:
+        usuario_id = session.get("user", {}).get("id")
+        if not usuario_id:
+            return jsonify({"success": False, "message": "Usuario no autenticado"}), 401
+        
+        data = request.get_json()
+        
+        # Obtener datos actuales para mantener campos que no se actualizan
+        r_usuario = requests.get(f"{API_URL}/api/persona/lista/{usuario_id}", timeout=10)
+        if r_usuario.status_code != 200:
+            return jsonify({"success": False, "message": "Error al obtener datos del usuario"}), 400
+        
+        datos_actuales = r_usuario.json().get("persona", {})
+        cuenta_actual = datos_actuales.get("cuenta", {}) or {}
+        
+        # Preparar datos de actualización
+        datos_actualizacion = {
+            "id_persona": usuario_id,
+            "tipo_identificacion": data.get("tipo_identificacion", datos_actuales.get("tipo_identificacion")),
+            "numero_identificacion": data.get("numero_identificacion", datos_actuales.get("numero_identificacion")),
+            "nombre": data.get("nombre", datos_actuales.get("nombre")),
+            "apellido": data.get("apellido", datos_actuales.get("apellido")),
+            "direccion": data.get("direccion", datos_actuales.get("direccion")),
+            "fecha_nacimiento": data.get("fecha_nacimiento", datos_actuales.get("fecha_nacimiento")),
+            "telefono": data.get("telefono", datos_actuales.get("telefono")),
+            "correo": data.get("correo", datos_actuales.get("correo")),
+            "genero": data.get("genero", datos_actuales.get("genero")),
+            "tipo_tarifa": datos_actuales.get("tipo_tarifa", "General"),
+            "saldo_disponible": datos_actuales.get("saldo_disponible", 0.0),
+            "cuenta": cuenta_actual,
+            "metodo_pago": datos_actuales.get("metodo_pago"),
+        }
+        
+        # Actualizar contraseña si se proporciona
+        if data.get("nueva_contrasena"):
+            datos_actualizacion["cuenta"] = {
+                **cuenta_actual,
+                "contrasena": data.get("nueva_contrasena")
+            }
+        
+        response = requests.put(f"{API_URL}/api/persona/actualizar", json=datos_actualizacion, timeout=10)
+        
+        if response.status_code == 200:
+            return jsonify({"success": True, "message": "Perfil actualizado correctamente"})
+        else:
+            return jsonify({"success": False, "message": "Error al actualizar el perfil"}), 400
+            
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@router.route("/api/cliente/boleto/<int:boleto_id>/pdf")
+@requiere_iniciar
+def api_descargar_boleto_pdf(boleto_id):
+    """Genera y descarga el PDF de un boleto específico"""
+    try:
+        usuario_id = session.get("user", {}).get("id")
+        if not usuario_id:
+            return jsonify({"error": "Usuario no autenticado"}), 401
+        
+        # Obtener información del boleto
+        response = requests.get(f"{API_URL}/api/boleto/lista/{boleto_id}", timeout=10)
+        if response.status_code != 200:
+            return jsonify({"error": "Boleto no encontrado"}), 404
+        
+        boleto = response.json().get("boleto", {})
+        
+        # Verificar que el boleto pertenece al usuario
+        persona_boleto = boleto.get("persona", {}) or {}
+        if persona_boleto.get("id_persona") != usuario_id:
+            return jsonify({"error": "No autorizado"}), 403
+        
+        # Generar PDF (similar a la función existente generar_boleto_pdf)
+        turno = boleto.get("turno", {}) or {}
+        horario = turno.get("horario", {}) or {}
+        frecuencia = horario.get("frecuencia", {}) or {}
+        ruta = frecuencia.get("ruta", {}) or {}
+        bus = turno.get("bus", {}) or {}
+        cooperativa = bus.get("cooperativa", {}) or {}
+        
+        from fpdf import FPDF
+        import tempfile
+        
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(0, 10, "BOLETO DE VIAJE - AVENTURABUS", ln=True, align="C")
+        pdf.ln(10)
+        
+        pdf.set_font("Arial", "", 12)
+        pdf.cell(0, 8, f"No. Boleto: {boleto.get('id_boleto', '')}", ln=True)
+        pdf.cell(0, 8, f"Pasajero: {persona_boleto.get('nombre', '')} {persona_boleto.get('apellido', '')}", ln=True)
+        pdf.cell(0, 8, f"Ruta: {ruta.get('origen', '')} - {ruta.get('destino', '')}", ln=True)
+        pdf.cell(0, 8, f"Fecha Salida: {frecuencia.get('fecha_salida', '')}", ln=True)
+        pdf.cell(0, 8, f"Hora: {horario.get('hora_salida', '')} - {horario.get('hora_llegada', '')}", ln=True)
+        pdf.cell(0, 8, f"Asiento: {boleto.get('numero_asiento', '')}", ln=True)
+        pdf.cell(0, 8, f"Cooperativa: {cooperativa.get('nombre_cooperativa', '')}", ln=True)
+        pdf.cell(0, 8, f"Bus: {bus.get('placa', '')}", ln=True)
+        pdf.cell(0, 8, f"Precio: ${boleto.get('precio_unitario', 0):.2f}", ln=True)
+        
+        # Crear archivo temporal
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+            pdf.output(tmp.name)
+            tmp_path = tmp.name
+        
+        from flask import send_file
+        return send_file(
+            tmp_path,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f"boleto_{boleto_id}.pdf"
+        )
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

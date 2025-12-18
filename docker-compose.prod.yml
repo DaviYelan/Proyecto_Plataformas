@@ -24,6 +24,7 @@ services:
       - FLASK_SECRET_KEY=QjRReXlVb1ZYWG1RNkF4bG1xS0xVSWJfV1R3cV9rM2pZcXJqWnNlVQ==
     volumes:
       - ./frontend:/app
+      - ./backend/data:/app/data
     env_file:
       - ./backend/.env
     depends_on:

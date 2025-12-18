@@ -1,5 +1,6 @@
 [
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfcf" },
     "id_cuenta": 1,
     "correo": "v@n.com",
     "contrasenia": "Abc4321@",
@@ -9,6 +10,7 @@
     "lockedUntil": 0
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd0" },
     "id_cuenta": 2,
     "correo": "1@1.com",
     "contrasenia": "Abc1234@",
@@ -16,6 +18,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd1" },
     "id_cuenta": 3,
     "correo": "2@2.com",
     "contrasenia": "Abc1234@",
@@ -23,6 +26,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd2" },
     "id_cuenta": 4,
     "correo": "x@x.com",
     "contrasenia": "Abc1234@",
@@ -30,6 +34,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd3" },
     "id_cuenta": 5,
     "correo": "nerod@gmail.com",
     "contrasenia": "toyota45*",
@@ -37,6 +42,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd4" },
     "id_cuenta": 6,
     "correo": "nerod@gmail.com",
     "contrasenia": "toyota45*",
@@ -44,6 +50,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd5" },
     "id_cuenta": 7,
     "correo": "dilan@gmail.com",
     "contrasenia": "dilan123.",
@@ -51,13 +58,15 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd6" },
     "id_cuenta": 8,
-    "correo": "mama\u0027@gmail.com",
+    "correo": "mama'@gmail.com",
     "contrasenia": "1720500139M",
     "estado_cuenta": "Activo",
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd7" },
     "id_cuenta": 9,
     "correo": "luillis@gmail.com",
     "contrasenia": "Remolacha34*",
@@ -65,6 +74,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd8" },
     "id_cuenta": 10,
     "correo": "123@1.com",
     "contrasenia": "Abc1234@",
@@ -72,6 +82,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfd9" },
     "id_cuenta": 11,
     "correo": "1234@1.com",
     "contrasenia": "Abc1234@",
@@ -79,6 +90,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfda" },
     "id_cuenta": 12,
     "correo": "12345@1.com",
     "contrasenia": "Abc1234@",
@@ -86,6 +98,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfdb" },
     "id_cuenta": 13,
     "correo": "pepito@gmail.com",
     "contrasenia": "tesla6767*",
@@ -93,6 +106,7 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfdc" },
     "id_cuenta": 14,
     "correo": "pepeperez@gmail.com",
     "contrasenia": "Peralta5534*",
@@ -100,9 +114,132 @@
     "tipo_cuenta": "Cliente"
   },
   {
+    "_id": { "$oid": "69385759da8d81a7fe92bfdd" },
     "id_cuenta": 15,
     "correo": "raules@gmail.com",
     "contrasenia": "toronja2323*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3af" },
+    "id_cuenta": 2,
+    "correo": "1@1.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Inactivo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b0" },
+    "id_cuenta": 14,
+    "correo": "pepeperez@gmail.com",
+    "contrasenia": "Peralta5534*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b1" },
+    "id_cuenta": 6,
+    "correo": "nerod@gmail.com",
+    "contrasenia": "toyota45*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b2" },
+    "id_cuenta": 8,
+    "correo": "mama'@gmail.com",
+    "contrasenia": "1720500139M",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b3" },
+    "id_cuenta": 5,
+    "correo": "nerod@gmail.com",
+    "contrasenia": "toyota45*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b4" },
+    "id_cuenta": 7,
+    "correo": "dilan@gmail.com",
+    "contrasenia": "dilan123.",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b5" },
+    "id_cuenta": 1,
+    "correo": "v@n.com",
+    "contrasenia": "Abc4321@",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Administrador",
+    "failedAttempts": 0,
+    "lockedUntil": 0
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b6" },
+    "id_cuenta": 3,
+    "correo": "2@2.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Suspendido",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b7" },
+    "id_cuenta": 12,
+    "correo": "12345@1.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b8" },
+    "id_cuenta": 10,
+    "correo": "123@1.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3b9" },
+    "id_cuenta": 15,
+    "correo": "raules@gmail.com",
+    "contrasenia": "toronja2323*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3ba" },
+    "id_cuenta": 4,
+    "correo": "x@x.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3bb" },
+    "id_cuenta": 9,
+    "correo": "luillis@gmail.com",
+    "contrasenia": "Remolacha34*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3bc" },
+    "id_cuenta": 13,
+    "correo": "pepito@gmail.com",
+    "contrasenia": "tesla6767*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "_id": { "$oid": "69385be17fc8ebd01dacf3bd" },
+    "id_cuenta": 11,
+    "correo": "1234@1.com",
+    "contrasenia": "Abc1234@",
     "estado_cuenta": "Activo",
     "tipo_cuenta": "Cliente"
   }

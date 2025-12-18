@@ -1,0 +1,847 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  LayoutDashboard, Bus, Map, Users, Settings, LogOut, Plus, 
+  Trash2, User as UserIcon, Tag, GitCommit, Clock, Menu, X, DollarSign, TrendingUp, Edit, Save, Eye, Download, Check, Truck, Loader2
+} from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { User, Cooperative, Stopover, Discount, RouteDefinition, Trip, BusUnit } from '../types';
+import * as api from '../services/apiService';
+
+interface AdminDashboardProps {
+  user: User;
+  onLogout: () => void;
+}
+
+// --- MOCK DATA ---
+
+const MOCK_CHART_DATA = [
+  { name: 'Lun', sales: 4000, revenue: 2400 },
+  { name: 'Mar', sales: 3000, revenue: 1398 },
+  { name: 'Mie', sales: 2000, revenue: 9800 },
+  { name: 'Jue', sales: 2780, revenue: 3908 },
+  { name: 'Vie', sales: 1890, revenue: 4800 },
+  { name: 'Sab', sales: 2390, revenue: 3800 },
+  { name: 'Dom', sales: 3490, revenue: 4300 },
+];
+
+// --- MAIN COMPONENT ---
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'cooperatives' | 'buses' | 'routes' | 'schedules' | 'users' | 'scales' | 'discounts' | 'settings' | 'profile'>('dashboard');
+  const [currentAdmin, setCurrentAdmin] = useState<User>(user);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Data States
+  const [cooperatives, setCooperatives] = useState<Cooperative[]>([]);
+  const [buses, setBuses] = useState<BusUnit[]>([]);
+  const [routesDef, setRoutesDef] = useState<RouteDefinition[]>([]);
+  const [schedules, setSchedules] = useState<Trip[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [scales, setScales] = useState<Stopover[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [boletos, setBoletos] = useState<api.BoletoBackend[]>([]);
+
+  // Cargar datos del backend al iniciar
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [coopData, busData, rutaData, horarioData, escalaData, descuentoData, personaData, boletosData] = await Promise.all([
+          api.getCooperativas(),
+          api.getBuses(),
+          api.getRutas(),
+          api.getHorarios(),
+          api.getEscalas(),
+          api.getDescuentos(),
+          api.getPersonas(),
+          api.getBoletos()
+        ]);
+
+        setCooperatives(coopData.map(api.mapCooperativa));
+        setBuses(busData.map(api.mapBus));
+        setRoutesDef(rutaData.map(api.mapRuta));
+        setSchedules(horarioData.map(api.mapHorario));
+        setScales(escalaData.map(api.mapEscala));
+        setDiscounts(descuentoData.map(api.mapDescuento));
+        setUsers(personaData.map(api.mapPersona));
+        setBoletos(boletosData);
+      } catch (error) {
+        console.error('Error al cargar datos:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Modal State
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<string>('');
+  const [editingItem, setEditingItem] = useState<any>(null);
+
+  // Handlers
+  const handleDelete = async (setter: any, id: string, type: string) => {
+    if (window.confirm('¿Confirmar eliminación? Esta acción no se puede deshacer.')) {
+        const numId = parseInt(id);
+        let success = false;
+        
+        switch (type) {
+          case 'cooperative':
+            success = await api.deleteCooperativa(numId);
+            break;
+          case 'bus':
+            success = await api.deleteBus(numId);
+            break;
+          case 'route':
+            success = await api.deleteRuta(numId);
+            break;
+          case 'schedule':
+            success = await api.deleteHorario(numId);
+            break;
+          case 'scale':
+            success = await api.deleteEscala(numId);
+            break;
+          case 'discount':
+            success = await api.deleteDescuento(numId);
+            break;
+          case 'user':
+            success = await api.deletePersona(numId);
+            break;
+        }
+        
+        if (success) {
+          setter((prev: any[]) => prev.filter((item: any) => item.id !== id));
+        } else {
+          alert('Error al eliminar el registro');
+        }
+    }
+  };
+
+  const handleEdit = (type: string, item: any) => {
+      setModalType(type);
+      setEditingItem(item);
+      setModalOpen(true);
+  };
+
+  const handleAdd = (type: string) => {
+      setModalType(type);
+      setEditingItem(null); // Null means new item
+      setModalOpen(true);
+  };
+
+  const handleSaveItem = (formData: any) => {
+      const newItem = { ...formData, id: editingItem ? editingItem.id : Date.now().toString() };
+      
+      switch (modalType) {
+          case 'cooperative':
+              setCooperatives(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
+              break;
+          case 'bus':
+              setBuses(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
+              break;
+          case 'route':
+              setRoutesDef(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
+              break;
+          case 'schedule':
+               setSchedules(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
+              break;
+          case 'user':
+              setUsers(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, newItem]);
+              break;
+          case 'scale':
+              setScales(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, newItem]);
+              break;
+          case 'discount':
+              setDiscounts(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
+              break;
+      }
+      setModalOpen(false);
+  };
+
+  const closeSidebar = () => setIsSidebarOpen(false);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-[#2ecc71] mx-auto mb-4" />
+          <p className="text-gray-400">Cargando datos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const NavItems = () => (
+     <>
+        <SidebarItem icon={<LayoutDashboard size={20} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); closeSidebar(); }} />
+        <SidebarItem icon={<Bus size={20} />} label="Cooperativas" active={activeTab === 'cooperatives'} onClick={() => { setActiveTab('cooperatives'); closeSidebar(); }} />
+        <SidebarItem icon={<Truck size={20} />} label="Buses (Flota)" active={activeTab === 'buses'} onClick={() => { setActiveTab('buses'); closeSidebar(); }} />
+        <SidebarItem icon={<Map size={20} />} label="Rutas" active={activeTab === 'routes'} onClick={() => { setActiveTab('routes'); closeSidebar(); }} />
+        <SidebarItem icon={<Clock size={20} />} label="Horarios" active={activeTab === 'schedules'} onClick={() => { setActiveTab('schedules'); closeSidebar(); }} />
+        <SidebarItem icon={<GitCommit size={20} />} label="Escalas" active={activeTab === 'scales'} onClick={() => { setActiveTab('scales'); closeSidebar(); }} />
+        <SidebarItem icon={<Users size={20} />} label="Clientes" active={activeTab === 'users'} onClick={() => { setActiveTab('users'); closeSidebar(); }} />
+        <SidebarItem icon={<Tag size={20} />} label="Descuentos" active={activeTab === 'discounts'} onClick={() => { setActiveTab('discounts'); closeSidebar(); }} />
+        <SidebarItem icon={<Settings size={20} />} label="Configuración" active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); closeSidebar(); }} />
+        <SidebarItem icon={<UserIcon size={20} />} label="Mi Perfil" active={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); closeSidebar(); }} />
+     </>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#121212] flex font-sans text-gray-200 pt-16 lg:pt-0">
+      
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 w-full bg-[#1e1e1e] border-b border-gray-800 z-30 px-4 py-3 flex items-center justify-between">
+         <div className="flex items-center gap-2">
+            <div className="bg-[#2ecc71] p-1 rounded">
+               <Bus className="h-5 w-5 text-white" />
+            </div>
+            <span className="font-bold text-white">AdminPanel</span>
+         </div>
+         <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-300">
+            <Menu size={24} />
+         </button>
+      </div>
+
+      {/* Sidebar - Desktop */}
+      <aside className="hidden lg:flex w-64 bg-[#1e1e1e] border-r border-gray-800 flex-col fixed h-full z-20 overflow-y-auto">
+        <div className="p-6 border-b border-gray-800 flex items-center gap-3">
+          <div className="bg-[#2ecc71] p-1.5 rounded-lg">
+            <Bus className="h-6 w-6 text-white" />
+          </div>
+          <span className="text-xl font-bold text-white tracking-wide">AdminPanel</span>
+        </div>
+        <nav className="flex-1 p-4 space-y-2"><NavItems /></nav>
+        <div className="p-4 border-t border-gray-800">
+          <button onClick={onLogout} className="w-full flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800 px-3 py-2 rounded-lg transition-colors text-sm">
+            <LogOut size={16} /> Cerrar Sesión
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile Drawer */}
+      {isSidebarOpen && (
+          <div className="fixed inset-0 z-40 lg:hidden flex">
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={closeSidebar}></div>
+              <div className="relative w-3/4 max-w-xs bg-[#1e1e1e] h-full shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
+                  <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+                    <span className="font-bold text-white text-lg">Menú Admin</span>
+                    <button onClick={closeSidebar}><X size={24} className="text-gray-400"/></button>
+                  </div>
+                  <nav className="flex-1 p-4 space-y-2 overflow-y-auto"><NavItems /></nav>
+                  <div className="p-4 border-t border-gray-800">
+                    <button onClick={onLogout} className="w-full flex items-center gap-2 text-red-400 bg-red-900/10 px-3 py-3 rounded-lg text-sm font-bold"><LogOut size={16} /> Cerrar Sesión</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 lg:ml-64 p-4 md:p-8 overflow-y-auto w-full">
+        {activeTab === 'dashboard' && <DashboardOverview boletos={boletos} users={users} routes={routesDef} />}
+        {activeTab === 'cooperatives' && <ManageCooperatives data={cooperatives} onAdd={() => handleAdd('cooperative')} onEdit={(item: any) => handleEdit('cooperative', item)} onDelete={(id: string) => handleDelete(setCooperatives, id, 'cooperative')} />}
+        {activeTab === 'buses' && <ManageBuses data={buses} onAdd={() => handleAdd('bus')} onEdit={(item: any) => handleEdit('bus', item)} onDelete={(id: string) => handleDelete(setBuses, id, 'bus')} />}
+        {activeTab === 'routes' && <ManageRoutes data={routesDef} onAdd={() => handleAdd('route')} onEdit={(item: any) => handleEdit('route', item)} onDelete={(id: string) => handleDelete(setRoutesDef, id, 'route')} />}
+        {activeTab === 'schedules' && <ManageSchedules data={schedules} onAdd={() => handleAdd('schedule')} onEdit={(item: any) => handleEdit('schedule', item)} onDelete={(id: string) => handleDelete(setSchedules, id, 'schedule')} />}
+        {activeTab === 'users' && <ManageUsers data={users} onAdd={() => handleAdd('user')} onEdit={(item: any) => handleEdit('user', item)} onDelete={(id: string) => handleDelete(setUsers, id, 'user')} />}
+        {activeTab === 'scales' && <ManageScales data={scales} onAdd={() => handleAdd('scale')} onEdit={(item: any) => handleEdit('scale', item)} onDelete={(id: string) => handleDelete(setScales, id, 'scale')} />}
+        {activeTab === 'discounts' && <ManageDiscounts data={discounts} onAdd={() => handleAdd('discount')} onEdit={(item: any) => handleEdit('discount', item)} onDelete={(id: string) => handleDelete(setDiscounts, id, 'discount')} />}
+        {activeTab === 'settings' && <ManageSettings />}
+        {activeTab === 'profile' && <AdminProfile user={currentAdmin} onUpdate={(d: any) => setCurrentAdmin(prev => ({...prev, ...d}))} />}
+      </main>
+
+      {/* Generic Modal Form Overlay */}
+      {modalOpen && (
+          <ModalForm 
+            type={modalType} 
+            data={editingItem} 
+            onClose={() => setModalOpen(false)} 
+            onSave={handleSaveItem} 
+          />
+      )}
+    </div>
+  );
+};
+
+// --- SUB-COMPONENTS ---
+
+const SidebarItem = ({ icon, label, active, onClick }: any) => (
+  <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 text-left ${active ? 'bg-[#2ecc71] text-white shadow-lg shadow-green-500/20' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+    {icon}
+    <span className="font-medium text-sm">{label}</span>
+  </button>
+);
+
+const DashboardOverview = ({ boletos, users, routes }: { boletos: api.BoletoBackend[], users: User[], routes: RouteDefinition[] }) => {
+    // Calcular estadísticas reales
+    const totalSales = boletos.reduce((sum, b) => sum + (b.precio_final || 0), 0);
+    const totalTickets = boletos.length;
+    const totalClients = users.length;
+    const activeRoutes = routes.filter(r => r.status === 'active').length;
+
+    return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-white">Bienvenido Admin</h1>
+          <p className="text-gray-400 mt-1">Resumen de la actividad de hoy.</p>
+        </div>
+        <button className="bg-[#2a2e2a] hover:bg-[#323632] text-white px-4 py-2 rounded-lg text-sm border border-gray-700 transition-colors flex items-center gap-2">
+            <Download size={16}/> Descargar Reporte
+        </button>
+      </div>
+  
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <StatCard title="Ventas Totales" value={`$${totalSales.toLocaleString('es-EC', { minimumFractionDigits: 2 })}`} change="+15%" icon={<DollarSign className="text-green-400" />} />
+        <StatCard title="Boletos Vendidos" value={totalTickets.toLocaleString()} change="+8%" icon={<TrendingUp className="text-[#2ecc71]" />} />
+        <StatCard title="Clientes Registrados" value={totalClients.toLocaleString()} change="+2%" icon={<Users className="text-blue-400" />} />
+        <StatCard title="Rutas Activas" value={activeRoutes.toLocaleString()} change="0%" icon={<Map className="text-purple-400" />} />
+      </div>
+
+      <div className="bg-[#1e1e1e] p-6 rounded-xl border border-gray-800 shadow-lg">
+         <h3 className="text-lg font-bold text-white mb-6">Ingresos Semanales</h3>
+         <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={MOCK_CHART_DATA}>
+                    <defs>
+                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2ecc71" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#2ecc71" stopOpacity={0}/>
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
+                    <XAxis dataKey="name" stroke="#666" />
+                    <YAxis stroke="#666" />
+                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', borderRadius: '8px' }} itemStyle={{ color: '#2ecc71' }} />
+                    <Area type="monotone" dataKey="sales" stroke="#2ecc71" fillOpacity={1} fill="url(#colorSales)" />
+                </AreaChart>
+            </ResponsiveContainer>
+         </div>
+      </div>
+    </div>
+    );
+};
+
+const StatCard = ({ title, value, change, icon }: any) => (
+  <div className="bg-[#1e1e1e] p-5 rounded-xl border border-gray-800 shadow-lg">
+    <div className="flex justify-between items-start mb-4">
+      <div className="p-2 bg-gray-800 rounded-lg">{icon}</div>
+      <span className="text-green-400 text-xs font-bold bg-green-400/10 px-2 py-1 rounded">{change}</span>
+    </div>
+    <h3 className="text-2xl font-bold text-white mb-1">{value}</h3>
+    <p className="text-gray-400 text-xs uppercase font-bold">{title}</p>
+  </div>
+);
+
+const TableWrapper = ({ children }: any) => (
+    <div className="bg-[#1e1e1e] rounded-xl border border-gray-800 shadow-lg overflow-hidden">
+        <div className="overflow-x-auto">
+            {children}
+        </div>
+    </div>
+);
+
+const ManageCooperatives = ({ data, onAdd, onEdit, onDelete }: any) => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex justify-between items-center">
+             <h2 className="text-xl md:text-2xl font-bold text-white">Cooperativas</h2>
+             <button onClick={onAdd} className="bg-[#2ecc71] text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium"><Plus size={16} /> Agregar</button>
+        </div>
+        <TableWrapper>
+             <table className="w-full text-left text-sm text-gray-400 whitespace-nowrap">
+                <thead className="bg-[#252525] text-gray-200 uppercase text-xs">
+                    <tr>
+                        <th className="px-6 py-4">Nombre</th>
+                        <th className="px-6 py-4">RUC</th>
+                        <th className="px-6 py-4">Dirección</th>
+                        <th className="px-6 py-4">Teléfono</th>
+                        <th className="px-6 py-4">Email</th>
+                        <th className="px-6 py-4 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                    {data.map((c: Cooperative) => (
+                        <tr key={c.id} className="hover:bg-gray-800/50">
+                            <td className="px-6 py-4 font-bold text-white">{c.name}</td>
+                            <td className="px-6 py-4 font-mono text-[#2ecc71]">{c.ruc || 'N/A'}</td>
+                            <td className="px-6 py-4">{c.address || 'N/A'}</td>
+                            <td className="px-6 py-4">{c.phone || 'N/A'}</td>
+                            <td className="px-6 py-4">{c.email}</td>
+                            <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                <button onClick={() => onEdit(c)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(c.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+             </table>
+        </TableWrapper>
+    </div>
+);
+
+const ManageBuses = ({ data, onAdd, onEdit, onDelete }: any) => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex justify-between items-center">
+             <h2 className="text-xl md:text-2xl font-bold text-white">Flota de Buses</h2>
+             <button onClick={onAdd} className="bg-[#2ecc71] text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium"><Plus size={16} /> Agregar Bus</button>
+        </div>
+        <TableWrapper>
+             <table className="w-full text-left text-sm text-gray-400 whitespace-nowrap">
+                <thead className="bg-[#252525] text-gray-200 uppercase text-xs">
+                    <tr>
+                        <th className="px-6 py-4">#Bus (ID)</th>
+                        <th className="px-6 py-4">Placa</th>
+                        <th className="px-6 py-4">Marca</th>
+                        <th className="px-6 py-4">Modelo</th>
+                        <th className="px-6 py-4">Capacidad</th>
+                        <th className="px-6 py-4">Velocidad</th>
+                        <th className="px-6 py-4">Cooperativa</th>
+                        <th className="px-6 py-4">Estado</th>
+                        <th className="px-6 py-4 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                    {data.map((b: BusUnit) => (
+                        <tr key={b.id} className="hover:bg-gray-800/50">
+                            <td className="px-6 py-4 font-bold text-white">{b.id}</td>
+                            <td className="px-6 py-4 font-mono text-[#2ecc71]">{b.plate}</td>
+                            <td className="px-6 py-4">{b.brand}</td>
+                            <td className="px-6 py-4">{b.model}</td>
+                            <td className="px-6 py-4">{b.capacity} pax</td>
+                            <td className="px-6 py-4">{b.speedLimit} km/h</td>
+                            <td className="px-6 py-4">{b.cooperative}</td>
+                            <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded text-xs ${b.status === 'active' ? 'bg-green-500/10 text-green-400' : b.status === 'maintenance' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
+                                    {b.status === 'active' ? 'Activo' : b.status === 'maintenance' ? 'Mantenimiento' : 'Inactivo'}
+                                </span>
+                            </td>
+                            <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                <button onClick={() => onEdit(b)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(b.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+             </table>
+        </TableWrapper>
+    </div>
+);
+
+const ManageRoutes = ({ data, onAdd, onEdit, onDelete }: any) => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex justify-between items-center">
+             <h2 className="text-xl md:text-2xl font-bold text-white">Rutas</h2>
+             <button onClick={onAdd} className="bg-[#2ecc71] text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium"><Plus size={16} /> Nueva Ruta</button>
+        </div>
+        <TableWrapper>
+             <table className="w-full text-left text-sm text-gray-400 whitespace-nowrap">
+                <thead className="bg-[#252525] text-gray-200 uppercase text-xs">
+                    <tr>
+                        <th className="px-6 py-4">Origen</th>
+                        <th className="px-6 py-4">Destino</th>
+                        <th className="px-6 py-4">Distancia</th>
+                        <th className="px-6 py-4">T. Estimado</th>
+                        <th className="px-6 py-4">Precio Base</th>
+                        <th className="px-6 py-4">Estado</th>
+                        <th className="px-6 py-4 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                    {data.map((r: RouteDefinition) => (
+                        <tr key={r.id} className="hover:bg-gray-800/50">
+                            <td className="px-6 py-4 text-white font-medium">{r.origin}</td>
+                            <td className="px-6 py-4 text-white font-medium">{r.destination}</td>
+                            <td className="px-6 py-4">{r.distancekm} km</td>
+                            <td className="px-6 py-4">{r.estimatedDuration}</td>
+                            <td className="px-6 py-4 font-bold text-[#2ecc71]">${r.basePrice.toFixed(2)}</td>
+                            <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded text-xs ${r.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                                    {r.status}
+                                </span>
+                            </td>
+                            <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                <button onClick={() => onEdit(r)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(r.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+             </table>
+        </TableWrapper>
+    </div>
+);
+
+const ManageSchedules = ({ data, onAdd, onEdit, onDelete }: any) => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex justify-between items-center">
+             <h2 className="text-xl md:text-2xl font-bold text-white">Horarios (Turnos)</h2>
+             <button onClick={onAdd} className="bg-[#2ecc71] text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium"><Plus size={16} /> Nuevo Turno</button>
+        </div>
+        <TableWrapper>
+             <table className="w-full text-left text-sm text-gray-400 whitespace-nowrap">
+                <thead className="bg-[#252525] text-gray-200 uppercase text-xs">
+                    <tr>
+                        <th className="px-6 py-4">Hora Salida</th>
+                        <th className="px-6 py-4">Hora Llegada</th>
+                        <th className="px-6 py-4">Ruta</th>
+                        <th className="px-6 py-4">Bus</th>
+                        <th className="px-6 py-4">Cooperativa</th>
+                        <th className="px-6 py-4">Precio</th>
+                         <th className="px-6 py-4">Estado</th>
+                        <th className="px-6 py-4 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                    {data.map((t: Trip) => (
+                        <tr key={t.id} className="hover:bg-gray-800/50">
+                            <td className="px-6 py-4 font-bold text-white">{t.departureTime}</td>
+                            <td className="px-6 py-4">{t.arrivalTime}</td>
+                            <td className="px-6 py-4 text-xs">{t.origin} - {t.destination}</td>
+                            <td className="px-6 py-4 font-mono text-gray-300">{t.busId || 'N/A'}</td>
+                            <td className="px-6 py-4">{t.operator}</td>
+                             <td className="px-6 py-4 text-[#2ecc71]">${t.price.toFixed(2)}</td>
+                            <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded text-xs ${t.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                                    {t.status}
+                                </span>
+                            </td>
+                            <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                <button onClick={() => onEdit(t)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(t.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+             </table>
+        </TableWrapper>
+    </div>
+);
+
+const ManageUsers = ({ data, onAdd, onEdit, onDelete }: any) => (
+  <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center">
+           <h2 className="text-xl md:text-2xl font-bold text-white">Gestión de Usuarios</h2>
+           <button onClick={onAdd} className="bg-[#2ecc71] text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium"><Plus size={16} /> Nuevo Usuario</button>
+      </div>
+      <TableWrapper>
+           <table className="w-full text-left text-sm text-gray-400 whitespace-nowrap">
+              <thead className="bg-[#252525] text-gray-200 uppercase text-xs">
+                  <tr>
+                      <th className="px-6 py-4">ID</th>
+                      <th className="px-6 py-4">Nombre</th>
+                      <th className="px-6 py-4">Identificación</th>
+                      <th className="px-6 py-4">Email</th>
+                      <th className="px-6 py-4">Teléfono</th>
+                      <th className="px-6 py-4">Tarifa</th>
+                      <th className="px-6 py-4">Saldo</th>
+                      <th className="px-6 py-4">Rol</th>
+                      <th className="px-6 py-4 text-right">Acciones</th>
+                  </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                  {data.map((u: User) => (
+                      <tr key={u.id} className="hover:bg-gray-800/50">
+                          <td className="px-6 py-4 font-mono text-gray-500">{u.id}</td>
+                          <td className="px-6 py-4 text-white font-medium">{u.name} {u.lastName}</td>
+                          <td className="px-6 py-4 font-mono">{u.identificationNumber || '-'}</td>
+                          <td className="px-6 py-4">{u.email}</td>
+                          <td className="px-6 py-4">{u.phone || '-'}</td>
+                          <td className="px-6 py-4"><span className="bg-gray-700 px-2 py-1 rounded text-xs">{u.tariffType || 'General'}</span></td>
+                          <td className="px-6 py-4 font-bold text-[#2ecc71]">${u.balance?.toFixed(2) || '0.00'}</td>
+                          <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs ${u.role === 'admin' ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400'}`}>{u.role === 'admin' ? 'Admin' : 'Cliente'}</span></td>
+                          <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                <button onClick={() => onEdit(u)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(u.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                          </td>
+                      </tr>
+                  ))}
+              </tbody>
+           </table>
+      </TableWrapper>
+  </div>
+);
+
+const ManageScales = ({ data, onAdd, onEdit, onDelete }: any) => (
+  <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center">
+           <h2 className="text-xl md:text-2xl font-bold text-white">Escalas y Paradas</h2>
+           <button onClick={onAdd} className="bg-[#2ecc71] text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium"><Plus size={16} /> Nueva Escala</button>
+      </div>
+      <TableWrapper>
+           <table className="w-full text-left text-sm text-gray-400 whitespace-nowrap">
+              <thead className="bg-[#252525] text-gray-200 uppercase text-xs">
+                  <tr>
+                      <th className="px-6 py-4">ID</th>
+                      <th className="px-6 py-4">Lugar</th>
+                      <th className="px-6 py-4">Tiempo</th>
+                      <th className="px-6 py-4 text-right">Acciones</th>
+                  </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                  {data.map((s: Stopover) => (
+                      <tr key={s.id} className="hover:bg-gray-800/50">
+                          <td className="px-6 py-4 font-mono text-gray-500">{s.id}</td>
+                          <td className="px-6 py-4 font-bold text-white">{s.location}</td>
+                          <td className="px-6 py-4">{s.arrivalTime}</td>
+                          <td className="px-6 py-4 text-right flex justify-end gap-2">
+                              <button onClick={() => onEdit(s)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
+                              <button onClick={() => onDelete(s.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                          </td>
+                      </tr>
+                  ))}
+              </tbody>
+           </table>
+      </TableWrapper>
+  </div>
+);
+
+const ManageDiscounts = ({ data, onAdd, onEdit, onDelete }: any) => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center">
+           <h2 className="text-xl md:text-2xl font-bold text-white">Cupones y Descuentos</h2>
+           <button onClick={onAdd} className="bg-[#2ecc71] text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium"><Plus size={16} /> Crear Descuento</button>
+      </div>
+      <TableWrapper>
+           <table className="w-full text-left text-sm text-gray-400 whitespace-nowrap">
+              <thead className="bg-[#252525] text-gray-200 uppercase text-xs">
+                  <tr>
+                      <th className="px-6 py-4">ID</th>
+                      <th className="px-6 py-4">Tipo</th>
+                      <th className="px-6 py-4">Nombre</th>
+                      <th className="px-6 py-4">Descripción</th>
+                      <th className="px-6 py-4">Porcentaje</th>
+                      <th className="px-6 py-4">Estado</th>
+                      <th className="px-6 py-4 text-right">Acciones</th>
+                  </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                  {data.map((d: Discount) => (
+                      <tr key={d.id} className="hover:bg-gray-800/50">
+                          <td className="px-6 py-4 font-mono text-gray-500">{d.id}</td>
+                          <td className="px-6 py-4"><span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded text-xs">{d.type || 'N/A'}</span></td>
+                          <td className="px-6 py-4 font-bold text-white">{d.name}</td>
+                          <td className="px-6 py-4 text-xs text-gray-400 max-w-[250px] truncate" title={d.description}>{d.description || 'N/A'}</td>
+                          <td className="px-6 py-4 font-bold text-[#2ecc71]">{d.percentage}%</td>
+                          <td className="px-6 py-4">
+                              <span className={`px-2 py-1 rounded text-xs ${d.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                                  {d.status === 'active' ? 'Activo' : 'Inactivo'}
+                              </span>
+                          </td>
+                          <td className="px-6 py-4 text-right flex justify-end gap-2">
+                              <button onClick={() => onEdit(d)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
+                              <button onClick={() => onDelete(d.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                          </td>
+                      </tr>
+                  ))}
+              </tbody>
+           </table>
+      </TableWrapper>
+    </div>
+);
+
+const ManageSettings = () => (
+    <div className="max-w-4xl space-y-6 animate-in fade-in duration-300">
+        <h2 className="text-xl md:text-2xl font-bold text-white">Configuración del Sistema</h2>
+        <div className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-6 space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+                <div>
+                    <h4 className="font-bold text-white">Modo Mantenimiento</h4>
+                    <p className="text-sm text-gray-500">Desactiva el acceso a clientes temporalmente.</p>
+                </div>
+                <input type="checkbox" className="accent-[#2ecc71] w-6 h-6" />
+            </div>
+            <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+                <div>
+                    <h4 className="font-bold text-white">Notificaciones por Email</h4>
+                    <p className="text-sm text-gray-500">Enviar correos automáticos de confirmación.</p>
+                </div>
+                <input type="checkbox" defaultChecked className="accent-[#2ecc71] w-6 h-6" />
+            </div>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h4 className="font-bold text-white">Copias de Seguridad</h4>
+                    <p className="text-sm text-gray-500">Realizar backup diario de la base de datos.</p>
+                </div>
+                <button className="text-[#2ecc71] text-sm font-medium hover:underline">Configurar</button>
+            </div>
+        </div>
+    </div>
+);
+
+const AdminProfile = ({ user, onUpdate }: any) => {
+    const [formData, setFormData] = useState(user);
+    const [success, setSuccess] = useState(false);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onUpdate(formData);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+    };
+
+    return (
+        <div className="max-w-4xl space-y-6 animate-in fade-in duration-300">
+             <div className="flex items-center justify-between">
+                <h2 className="text-xl md:text-2xl font-bold text-white">Mi Perfil</h2>
+             </div>
+             <form onSubmit={handleSubmit} className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-6 md:p-8 shadow-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nombre</label>
+                        <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-[#2a2e2a] text-white border border-gray-700 rounded-lg px-4 py-3 outline-none focus:border-[#2ecc71]" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Apellido</label>
+                        <input type="text" value={formData.lastName || ''} onChange={e => setFormData({...formData, lastName: e.target.value})} className="w-full bg-[#2a2e2a] text-white border border-gray-700 rounded-lg px-4 py-3 outline-none focus:border-[#2ecc71]" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Email</label>
+                        <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-[#2a2e2a] text-white border border-gray-700 rounded-lg px-4 py-3 outline-none focus:border-[#2ecc71]" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Teléfono</label>
+                        <input type="text" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-[#2a2e2a] text-white border border-gray-700 rounded-lg px-4 py-3 outline-none focus:border-[#2ecc71]" />
+                    </div>
+                    <div className="md:col-span-2 pt-4 border-t border-gray-800 mt-2">
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Cambiar Contraseña</label>
+                        <input type="password" placeholder="Nueva contraseña (dejar en blanco para mantener)" className="w-full bg-[#2a2e2a] text-white border border-gray-700 rounded-lg px-4 py-3 outline-none focus:border-[#2ecc71]" />
+                    </div>
+                </div>
+                <div className="flex justify-end mt-8">
+                    <button type="submit" className="bg-[#2ecc71] hover:bg-[#27ae60] text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg">
+                        {success ? <Check size={18} /> : <Save size={18} />} {success ? 'Guardado' : 'Guardar Cambios'}
+                    </button>
+                </div>
+             </form>
+        </div>
+    );
+};
+
+const ModalForm = ({ type, data, onClose, onSave }: any) => {
+    const [formData, setFormData] = useState(data || {});
+
+    const handleChange = (e: any) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const renderFields = () => {
+        switch(type) {
+            case 'cooperative':
+                return (
+                    <>
+                        <input name="name" placeholder="Nombre Cooperativa" defaultValue={data?.name} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="ruc" placeholder="RUC" defaultValue={data?.ruc} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="address" placeholder="Dirección" defaultValue={data?.address} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="phone" placeholder="Teléfono" defaultValue={data?.phone} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="email" placeholder="Email" defaultValue={data?.email} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                    </>
+                );
+            case 'bus':
+                return (
+                    <>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                             <input name="id" placeholder="# Bus (ID)" defaultValue={data?.id} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                             <input name="plate" placeholder="Placa" defaultValue={data?.plate} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                        </div>
+                        <input name="brand" placeholder="Marca" defaultValue={data?.brand} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="model" placeholder="Modelo" defaultValue={data?.model} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                         <div className="grid grid-cols-2 gap-3 mb-3">
+                             <input name="capacity" type="number" placeholder="Capacidad" defaultValue={data?.capacity} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                             <input name="speedLimit" type="number" placeholder="Velocidad Límite" defaultValue={data?.speedLimit} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                        </div>
+                        <input name="cooperative" placeholder="Cooperativa" defaultValue={data?.cooperative} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <select name="status" defaultValue={data?.status || 'active'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
+                            <option value="active">Activo</option>
+                            <option value="maintenance">Mantenimiento</option>
+                            <option value="inactive">Inactivo</option>
+                        </select>
+                    </>
+                );
+            case 'route':
+                return (
+                    <>
+                        <input name="origin" placeholder="Origen" defaultValue={data?.origin} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="destination" placeholder="Destino" defaultValue={data?.destination} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="distancekm" type="number" placeholder="Distancia (km)" defaultValue={data?.distancekm} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="estimatedDuration" placeholder="Duración Estimada" defaultValue={data?.estimatedDuration} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="basePrice" type="number" placeholder="Precio Base" defaultValue={data?.basePrice} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                    </>
+                );
+            case 'schedule':
+                return (
+                    <>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                            <input name="origin" placeholder="Origen" defaultValue={data?.origin} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                            <input name="destination" placeholder="Destino" defaultValue={data?.destination} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                             <input name="departureTime" type="time" defaultValue={data?.departureTime} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                             <input name="arrivalTime" type="time" defaultValue={data?.arrivalTime} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                        </div>
+                        <input name="operator" placeholder="Cooperativa" defaultValue={data?.operator} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="busId" placeholder="Bus ID (Placa/Disco)" defaultValue={data?.busId} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <input name="price" type="number" placeholder="Precio" defaultValue={data?.price} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                    </>
+                );
+            case 'user':
+                return (
+                    <>
+                       <input name="name" placeholder="Nombre" defaultValue={data?.name} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                       <input name="lastName" placeholder="Apellido" defaultValue={data?.lastName} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                       <input name="email" placeholder="Email" defaultValue={data?.email} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                       <input name="identificationNumber" placeholder="Cédula/ID" defaultValue={data?.identificationNumber} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                       <select name="role" defaultValue={data?.role || 'client'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
+                           <option value="client">Cliente</option>
+                           <option value="admin">Administrador</option>
+                       </select>
+                    </>
+                );
+            case 'discount':
+                return (
+                    <>
+                       <div className="grid grid-cols-2 gap-3 mb-3">
+                            <input name="type" placeholder="Tipo" defaultValue={data?.type} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                            <input name="code" placeholder="Código" defaultValue={data?.code} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                       </div>
+                       <input name="name" placeholder="Nombre" defaultValue={data?.name} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                       <textarea name="description" placeholder="Descripción" defaultValue={data?.description} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3 h-20 resize-none" />
+                       <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                                <label className="text-xs text-gray-500 block mb-1">Fecha Inicio</label>
+                                <input name="startDate" type="date" defaultValue={data?.startDate} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 block mb-1">Fecha Fin</label>
+                                <input name="validUntil" type="date" defaultValue={data?.validUntil} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                            </div>
+                       </div>
+                       <input name="percentage" type="number" placeholder="Porcentaje %" defaultValue={data?.percentage} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                    </>
+                );
+            default:
+                return <p className="text-gray-400">Formulario no configurado para {type}</p>;
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-[#1e1e1e] rounded-xl border border-gray-800 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="bg-[#252525] p-4 border-b border-gray-800 flex justify-between items-center">
+                    <h3 className="font-bold text-white capitalize">{data ? 'Editar' : 'Nuevo'} {type}</h3>
+                    <button onClick={onClose}><X className="text-gray-400 hover:text-white" /></button>
+                </div>
+                <div className="p-6">
+                    {renderFields()}
+                </div>
+                <div className="p-4 bg-[#252525] border-t border-gray-800 flex justify-end gap-3">
+                    <button onClick={onClose} className="px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors">Cancelar</button>
+                    <button onClick={() => onSave(formData)} className="px-6 py-2 bg-[#2ecc71] hover:bg-[#27ae60] text-white font-bold rounded shadow-lg">Guardar</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default AdminDashboard;

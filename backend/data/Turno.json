@@ -1,13 +1,13 @@
 [
   {
     "id_turno": 1,
-    "fecha_salida": "10/01/2025",
+    "fecha_salida": "11/12/2025",
     "numero_turno": 1,
     "estado_turno": "Disponible",
     "horario": {
       "id_horario": 1,
-      "hora_salida": "00:00",
-      "hora_llegada": "02:24",
+      "hora_salida": "06:00",
+      "hora_llegada": "08:24",
       "estado_horario": "Disponible",
       "ruta": {
         "id_ruta": 1,
@@ -40,13 +40,13 @@
   },
   {
     "id_turno": 2,
-    "fecha_salida": "10/01/2025",
+    "fecha_salida": "11/12/2025",
     "numero_turno": 2,
     "estado_turno": "Disponible",
     "horario": {
       "id_horario": 2,
-      "hora_salida": "00:00",
-      "hora_llegada": "02:21",
+      "hora_salida": "10:00",
+      "hora_llegada": "12:00",
       "estado_horario": "Disponible",
       "ruta": {
         "id_ruta": 3,

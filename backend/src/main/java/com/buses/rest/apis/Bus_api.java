@@ -20,7 +20,7 @@ import javax.ws.rs.GET;
 import modelo.Bus;
 import com.buses.rest.security.Secured;
 
-@Secured(roles = {"Administrador"})
+//@Secured(roles = {"Administrador"})
 @Path("/bus")
 public class Bus_api {
 

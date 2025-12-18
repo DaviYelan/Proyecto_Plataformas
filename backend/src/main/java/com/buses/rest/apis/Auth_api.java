@@ -22,7 +22,14 @@ import java.util.Collections;
 @Path("/auth")
 public class Auth_api {
     private String hashPassword(String plain) {
-        return plain;
+        try {
+            // Usar BCrypt para cifrar la contraseña con un factor de trabajo de 12
+            return BCrypt.hashpw(plain, BCrypt.gensalt(12));
+        } catch (Exception e) {
+            // En caso de error, devolver la contraseña sin cifrar como fallback
+            System.err.println("Error al cifrar contraseña: " + e.getMessage());
+            return plain;
+        }
     }
 
     private boolean matchesPassword(String plain, String stored) {
