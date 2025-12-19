@@ -350,8 +350,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
                  </div>
               </div>
               <div>
-                 <h1 className="text-xl md:text-2xl font-bold text-white">Hola, {currentUserData.name}</h1>
-                 <p className="text-gray-400 text-sm">Bienvenido a tu panel de control</p>
+                 <h1 className="text-xl md:text-2xl font-bold text-white">Bienvenido, {currentUserData.name}</h1>
+                 <p className="text-gray-400 text-sm">Gestiona tus viajes y reservas</p>
               </div>
            </div>
            <div className="flex gap-3 w-full md:w-auto">

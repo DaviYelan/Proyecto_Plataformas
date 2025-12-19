@@ -177,17 +177,70 @@ const App: React.FC = () => {
     await handleSearch(params);
   };
 
-  const handleTicketPurchased = (ticket: Ticket) => {
-    setPurchasedTickets(prev => [ticket, ...prev]);
-    // Descontar del saldo del usuario
-    setCurrentUser(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        balance: (prev.balance || 0) - ticket.totalPrice
+  const handleTicketPurchased = async (ticket: Ticket) => {
+    if (!currentUser) return;
+
+    try {
+      // Convertir ticket a formato backend
+      const boletoBackend = {
+        fecha_compra: new Date().toLocaleDateString('es-EC', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }),
+        numero_asiento: ticket.seatNumber,
+        cantidad_boleto: ticket.passengers,
+        precio_final: ticket.totalPrice,
+        estado_boleto: "Vendido",
+        persona: {
+          id_persona: currentUser.id
+        },
+        turno: {
+          fecha_salida: ticket.tripDate || ticket.date,
+          horario: {
+            hora_salida: ticket.departureTime,
+            hora_llegada: ticket.arrivalTime,
+            ruta: {
+              origen: ticket.origin,
+              destino: ticket.destination,
+              precio_unitario: ticket.totalPrice / ticket.passengers
+            }
+          }
+        }
       };
-    });
-    setView('client');
+
+      // Guardar boleto en backend
+      const boletoGuardado = await api.saveBoleto(boletoBackend);
+      
+      if (boletoGuardado) {
+        // Actualizar saldo del usuario en backend
+        const personasData = await api.getPersonas();
+        const persona = personasData.find(p => p.id_persona === currentUser.id);
+        
+        if (persona) {
+          const nuevoSaldo = (persona.saldo_disponible || 0) - ticket.totalPrice;
+          await api.updatePersona({
+            ...persona,
+            saldo_disponible: nuevoSaldo
+          });
+
+          // Actualizar estado local
+          setPurchasedTickets(prev => [ticket, ...prev]);
+          setCurrentUser(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              balance: nuevoSaldo
+            };
+          });
+        }
+      }
+      
+      setView('client');
+    } catch (error) {
+      console.error('Error al procesar compra:', error);
+      alert('Error al procesar la compra. Por favor intente nuevamente.');
+    }
   };
 
   const closeAllModals = () => {
@@ -394,6 +447,7 @@ const App: React.FC = () => {
           onClose={() => setIsSearchOpen(false)}
           onTicketPurchased={handleTicketPurchased}
           user={currentUser}
+          onUserUpdate={setCurrentUser}
         />
       )}
 

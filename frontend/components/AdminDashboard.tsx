@@ -87,34 +87,65 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         const numId = parseInt(id);
         let success = false;
         
-        switch (type) {
-          case 'cooperative':
-            success = await api.deleteCooperativa(numId);
-            break;
-          case 'bus':
-            success = await api.deleteBus(numId);
-            break;
-          case 'route':
-            success = await api.deleteRuta(numId);
-            break;
-          case 'schedule':
-            success = await api.deleteHorario(numId);
-            break;
-          case 'scale':
-            success = await api.deleteEscala(numId);
-            break;
-          case 'discount':
-            success = await api.deleteDescuento(numId);
-            break;
-          case 'user':
-            success = await api.deletePersona(numId);
-            break;
-        }
-        
-        if (success) {
-          setter((prev: any[]) => prev.filter((item: any) => item.id !== id));
-        } else {
-          alert('Error al eliminar el registro');
+        try {
+          switch (type) {
+            case 'cooperative':
+              success = await api.deleteCooperativa(numId);
+              if (success) {
+                const coopList = await api.getCooperativas();
+                setCooperatives(coopList.map(api.mapCooperativa));
+              }
+              break;
+            case 'bus':
+              success = await api.deleteBus(numId);
+              if (success) {
+                const busList = await api.getBuses();
+                setBuses(busList.map(api.mapBus));
+              }
+              break;
+            case 'route':
+              success = await api.deleteRuta(numId);
+              if (success) {
+                const rutasList = await api.getRutas();
+                setRoutesDef(rutasList.map(api.mapRuta));
+              }
+              break;
+            case 'schedule':
+              success = await api.deleteHorario(numId);
+              if (success) {
+                const horariosList = await api.getHorarios();
+                setSchedules(horariosList.map(api.mapHorario));
+              }
+              break;
+            case 'scale':
+              success = await api.deleteEscala(numId);
+              if (success) {
+                const escalasList = await api.getEscalas();
+                setScales(escalasList.map(api.mapEscala));
+              }
+              break;
+            case 'discount':
+              success = await api.deleteDescuento(numId);
+              if (success) {
+                const descuentosList = await api.getDescuentos();
+                setDiscounts(descuentosList.map(api.mapDescuento));
+              }
+              break;
+            case 'user':
+              success = await api.deletePersona(numId);
+              if (success) {
+                const personasList = await api.getPersonas();
+                setUsers(personasList.map(api.mapPersona));
+              }
+              break;
+          }
+          
+          if (!success) {
+            alert('Error al eliminar el registro');
+          }
+        } catch (error) {
+          console.error('Error al eliminar:', error);
+          alert('Error al procesar la eliminación');
         }
     }
   };
@@ -131,33 +162,257 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
       setModalOpen(true);
   };
 
-  const handleSaveItem = (formData: any) => {
-      const newItem = { ...formData, id: editingItem ? editingItem.id : Date.now().toString() };
+  const handleSaveItem = async (formData: any) => {
+    try {
+      console.log('handleSaveItem llamado con:', { modalType, formData, isEditing: editingItem !== null });
+      const isEditing = editingItem !== null;
+      let success = false;
       
       switch (modalType) {
-          case 'cooperative':
-              setCooperatives(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
-              break;
-          case 'bus':
-              setBuses(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
-              break;
-          case 'route':
-              setRoutesDef(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
-              break;
-          case 'schedule':
-               setSchedules(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
-              break;
-          case 'user':
-              setUsers(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, newItem]);
-              break;
-          case 'scale':
-              setScales(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, newItem]);
-              break;
-          case 'discount':
-              setDiscounts(prev => editingItem ? prev.map(i => i.id === newItem.id ? newItem : i) : [...prev, { ...newItem, status: 'active' }]);
-              break;
+        case 'cooperative': {
+          const coopData = {
+            id_cooperativa: isEditing ? parseInt(editingItem.id) : undefined,
+            nombre_cooperativa: formData.name,
+            ruc: formData.ruc,
+            direccion: formData.address,
+            telefono: formData.phone,
+            correo_empresarial: formData.email
+          };
+          
+          console.log('Datos de cooperativa a guardar:', coopData);
+          
+          if (isEditing) {
+            success = await api.updateCooperativa(coopData as api.CooperativaBackend);
+          } else {
+            success = await api.saveCooperativa(coopData);
+          }
+          
+          console.log('Resultado de guardar cooperativa:', success);
+          
+          if (success) {
+            const coopList = await api.getCooperativas();
+            setCooperatives(coopList.map(api.mapCooperativa));
+          }
+          break;
+        }
+        
+        case 'bus': {
+          console.log('formData completo:', formData);
+          console.log('cooperatives disponibles:', cooperatives);
+          const selectedCoop = cooperatives.find(c => c.id === (formData.cooperativeId || '1'));
+          console.log('cooperativa seleccionada:', selectedCoop, 'ID buscado:', formData.cooperativeId);
+          
+          const cooperativaId = selectedCoop ? parseInt(selectedCoop.id) : 1;
+          
+          if (isEditing) {
+            // Para actualizar, el backend espera 'id' no 'id_bus'
+            const updateData = {
+              id: parseInt(editingItem.id),
+              numero_bus: editingItem.numero_bus,
+              placa: formData.plate,
+              marca: formData.brand,
+              modelo: formData.model,
+              capacidad_pasajeros: parseInt(formData.capacity) || 0,
+              velocidad: parseInt(formData.speedLimit) || 0,
+              estado_bus: formData.status === 'active' ? 'Activo' : 'Inactivo',
+              cooperativa_id: cooperativaId
+            };
+            console.log('Datos para actualizar:', updateData);
+            success = await api.updateBus(updateData as any);
+          } else {
+            // Para crear, numero_bus debe ser un número pequeño (no timestamp)
+            // Usando Math.floor(Math.random() * 10000) para generar un número entre 0-9999
+            const createData: Partial<api.BusBackend> = {
+              numero_bus: Math.floor(Math.random() * 10000),
+              placa: formData.plate,
+              marca: formData.brand,
+              modelo: formData.model,
+              capacidad_pasajeros: parseInt(formData.capacity) || 0,
+              velocidad: parseInt(formData.speedLimit) || 0,
+              estado_bus: formData.status === 'active' ? 'Activo' : 'Inactivo',
+              cooperativa_id: cooperativaId
+            };
+            console.log('Datos para crear:', createData);
+            success = await api.saveBus(createData);
+          }
+          
+          console.log('Resultado de guardar bus:', success);
+          
+          if (success) {
+            const busList = await api.getBuses();
+            setBuses(busList.map(api.mapBus));
+          }
+          break;
+        }
+        
+        case 'route': {
+          const rutaData: any = {
+            id_ruta: isEditing ? parseInt(editingItem.id) : undefined,
+            origen: formData.origin,
+            destino: formData.destination,
+            precio_unitario: parseFloat(formData.basePrice) || 0,
+            distancia: parseInt(formData.distancekm) || 0,
+            tiempo_estimado: formData.estimatedDuration,
+            estado_ruta: 'Disponible',
+            bus: { id_bus: 1 }
+          };
+          
+          console.log('Datos de ruta a guardar:', rutaData);
+          
+          if (isEditing) {
+            success = await api.updateRuta(rutaData);
+          } else {
+            success = await api.saveRuta(rutaData);
+          }
+          
+          console.log('Resultado de guardar ruta:', success);
+          
+          if (success) {
+            const rutasList = await api.getRutas();
+            setRoutesDef(rutasList.map(api.mapRuta));
+          }
+          break;
+        }
+        
+        case 'schedule': {
+          const routeId = parseInt(formData.routeId) || 1;
+          
+          if (isEditing) {
+            // Para actualizar: enviar con id_horario
+            const updateData: Partial<api.HorarioBackend> = {
+              id_horario: parseInt(editingItem.id),
+              hora_salida: formData.departureTime || '00:00',
+              hora_llegada: formData.arrivalTime || '00:00',
+              estado_horario: formData.status === 'active' ? 'Disponible' : 'No disponible',
+              ruta: { id_ruta: routeId } as api.RutaBackend
+            };
+            console.log('Datos de horario para actualizar:', updateData);
+            success = await api.updateHorario(updateData as api.HorarioBackend);
+          } else {
+            // Para crear: no enviar id_horario
+            const createData: Partial<api.HorarioBackend> = {
+              hora_salida: formData.departureTime || '00:00',
+              hora_llegada: formData.arrivalTime || '00:00',
+              estado_horario: formData.status === 'active' ? 'Disponible' : 'No disponible',
+              ruta: { id_ruta: routeId } as api.RutaBackend
+            };
+            console.log('Datos de horario para crear:', createData);
+            success = await api.saveHorario(createData);
+          }
+          
+          console.log('Resultado de guardar horario:', success);
+          
+          if (success) {
+            const horariosList = await api.getHorarios();
+            setSchedules(horariosList.map(api.mapHorario));
+          }
+          break;
+        }
+        
+        case 'scale': {
+          const escalaData: Partial<api.EscalaBackend> = {
+            id_escala: isEditing ? parseInt(editingItem.id) : undefined,
+            lugar_escala: formData.location,
+            tiempo: formData.duration
+          };
+          
+          console.log('Datos de escala a guardar:', escalaData);
+          
+          if (isEditing) {
+            success = await api.updateEscala(escalaData as api.EscalaBackend);
+          } else {
+            success = await api.saveEscala(escalaData);
+          }
+          
+          console.log('Resultado de guardar escala:', success);
+          
+          if (success) {
+            const escalasList = await api.getEscalas();
+            setScales(escalasList.map(api.mapEscala));
+          }
+          break;
+        }
+        
+        case 'discount': {
+          const today = new Date().toISOString().split('T')[0];
+          const descuentoData: Partial<api.DescuentoBackend> = {
+            id_descuento: isEditing ? parseInt(editingItem.id) : undefined,
+            nombre_descuento: formData.name,
+            descripcion: formData.description,
+            porcentaje: parseInt(formData.percentage) || 0,
+            estado_descuento: formData.status === 'active' ? 'Activo' : 'Inactivo',
+            tipo_descuento: formData.type || 'Promocional',
+            fecha_inicio: formData.startDate || today,
+            fecha_fin: formData.endDate || today
+          };
+          
+          console.log('Datos de descuento a guardar:', descuentoData);
+          
+          if (isEditing) {
+            success = await api.updateDescuento(descuentoData as api.DescuentoBackend);
+          } else {
+            success = await api.saveDescuento(descuentoData);
+          }
+          
+          console.log('Resultado de guardar descuento:', success);
+          
+          if (success) {
+            const descuentosList = await api.getDescuentos();
+            setDiscounts(descuentosList.map(api.mapDescuento));
+          }
+          break;
+        }
+        
+        case 'user': {
+          const personaData: Partial<api.PersonaBackend> = {
+            id_persona: isEditing ? parseInt(editingItem.id) : undefined,
+            tipo_identificacion: formData.identificationType || 'Cedula',
+            numero_identificacion: formData.identificationNumber,
+            nombre: formData.name,
+            apellido: formData.lastName,
+            genero: formData.gender || 'No_definido',
+            correo: formData.email,
+            telefono: formData.phone || '',
+            direccion: formData.address || '',
+            fecha_nacimiento: formData.birthDate || '01/01/2000',
+            saldo_disponible: parseFloat(formData.balance) || 0,
+            tipo_tarifa: formData.tariffType || 'General',
+            usuario: formData.email,
+            contrasenia: formData.password || 'defaultPassword123',
+            estado_cuenta: 'Activo',
+            tipo_cuenta: formData.role === 'admin' ? 'Administrador' : 'Cliente'
+          };
+          
+          console.log('Datos de persona a guardar:', personaData);
+          
+          if (isEditing) {
+            success = await api.updatePersona(personaData as api.PersonaBackend);
+          } else {
+            success = await api.savePersona(personaData);
+          }
+          
+          console.log('Resultado de guardar persona:', success);
+          
+          if (success) {
+            const personasList = await api.getPersonas();
+            setUsers(personasList.map(api.mapPersona));
+          }
+          break;
+        }
       }
-      setModalOpen(false);
+      
+      console.log('Valor final de success:', success);
+      
+      if (success) {
+        setModalOpen(false);
+        alert('¡Guardado exitosamente!');
+      } else {
+        alert('Error al guardar. Por favor intente nuevamente.');
+      }
+    } catch (error) {
+      console.error('Error en handleSaveItem:', error);
+      alert('Error al procesar la solicitud.');
+    }
   };
 
   const closeSidebar = () => setIsSidebarOpen(false);
@@ -240,7 +495,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
       {/* Main Content */}
       <main className="flex-1 lg:ml-64 p-4 md:p-8 overflow-y-auto w-full">
-        {activeTab === 'dashboard' && <DashboardOverview boletos={boletos} users={users} routes={routesDef} />}
+        {activeTab === 'dashboard' && <DashboardOverview boletos={boletos} users={users} routes={routesDef} currentAdmin={currentAdmin} />}
         {activeTab === 'cooperatives' && <ManageCooperatives data={cooperatives} onAdd={() => handleAdd('cooperative')} onEdit={(item: any) => handleEdit('cooperative', item)} onDelete={(id: string) => handleDelete(setCooperatives, id, 'cooperative')} />}
         {activeTab === 'buses' && <ManageBuses data={buses} onAdd={() => handleAdd('bus')} onEdit={(item: any) => handleEdit('bus', item)} onDelete={(id: string) => handleDelete(setBuses, id, 'bus')} />}
         {activeTab === 'routes' && <ManageRoutes data={routesDef} onAdd={() => handleAdd('route')} onEdit={(item: any) => handleEdit('route', item)} onDelete={(id: string) => handleDelete(setRoutesDef, id, 'route')} />}
@@ -256,7 +511,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
       {modalOpen && (
           <ModalForm 
             type={modalType} 
-            data={editingItem} 
+            data={editingItem}
+            cooperatives={cooperatives}
+            routesDef={routesDef}
             onClose={() => setModalOpen(false)} 
             onSave={handleSaveItem} 
           />
@@ -274,7 +531,7 @@ const SidebarItem = ({ icon, label, active, onClick }: any) => (
   </button>
 );
 
-const DashboardOverview = ({ boletos, users, routes }: { boletos: api.BoletoBackend[], users: User[], routes: RouteDefinition[] }) => {
+const DashboardOverview = ({ boletos, users, routes, currentAdmin }: { boletos: api.BoletoBackend[], users: User[], routes: RouteDefinition[], currentAdmin: User }) => {
     // Calcular estadísticas reales
     const totalSales = boletos.reduce((sum, b) => sum + (b.precio_final || 0), 0);
     const totalTickets = boletos.length;
@@ -285,7 +542,7 @@ const DashboardOverview = ({ boletos, users, routes }: { boletos: api.BoletoBack
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Bienvenido Admin</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-white">Bienvenido {currentAdmin.name}</h1>
           <p className="text-gray-400 mt-1">Resumen de la actividad de hoy.</p>
         </div>
         <button className="bg-[#2a2e2a] hover:bg-[#323632] text-white px-4 py-2 rounded-lg text-sm border border-gray-700 transition-colors flex items-center gap-2">
@@ -719,11 +976,39 @@ const AdminProfile = ({ user, onUpdate }: any) => {
     );
 };
 
-const ModalForm = ({ type, data, onClose, onSave }: any) => {
-    const [formData, setFormData] = useState(data || {});
+const ModalForm = ({ type, data, cooperatives, routesDef, onClose, onSave }: any) => {
+    const getInitialFormData = () => {
+        // Si hay data para editar, usar esos datos
+        if (data) {
+            return {
+                ...data,
+                cooperativeId: data.cooperativeId || cooperatives[0]?.id?.toString() || '1',
+                routeId: data.routeId || '1',
+                status: data.status || 'active'
+            };
+        }
+        
+        // Para crear nuevo
+        if (type === 'bus') {
+            return { cooperativeId: cooperatives[0]?.id?.toString() || '1', status: 'active' };
+        }
+        if (type === 'schedule') {
+            return { 
+                routeId: '1', 
+                cooperativeId: cooperatives[0]?.id?.toString() || '1',
+                departureTime: '08:00',
+                arrivalTime: '12:00',
+                status: 'active'
+            };
+        }
+        return {};
+    };
+
+    const [formData, setFormData] = useState(getInitialFormData());
 
     const handleChange = (e: any) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const value = e.target.type === 'number' ? parseInt(e.target.value) : e.target.value;
+        setFormData({ ...formData, [e.target.name]: value });
     };
 
     const renderFields = () => {
@@ -751,8 +1036,10 @@ const ModalForm = ({ type, data, onClose, onSave }: any) => {
                              <input name="capacity" type="number" placeholder="Capacidad" defaultValue={data?.capacity} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
                              <input name="speedLimit" type="number" placeholder="Velocidad Límite" defaultValue={data?.speedLimit} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
                         </div>
-                        <input name="cooperative" placeholder="Cooperativa" defaultValue={data?.cooperative} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
-                        <select name="status" defaultValue={data?.status || 'active'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
+                        <select name="cooperativeId" value={formData.cooperativeId || cooperatives[0]?.id || '1'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
+                            {cooperatives.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                        <select name="status" value={formData.status || 'active'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
                             <option value="active">Activo</option>
                             <option value="maintenance">Mantenimiento</option>
                             <option value="inactive">Inactivo</option>
@@ -772,17 +1059,23 @@ const ModalForm = ({ type, data, onClose, onSave }: any) => {
             case 'schedule':
                 return (
                     <>
+                        <label className="text-gray-400 text-sm mb-1 block">Ruta (determina bus y cooperativa)</label>
+                        <select name="routeId" value={String(formData.routeId) || '1'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
+                            <option value="">Seleccionar Ruta</option>
+                            {routesDef.map(route => (
+                                <option key={route.id} value={String(route.id)}>{route.origin} → {route.destination}</option>
+                            ))}
+                        </select>
+                        <label className="text-gray-400 text-sm mb-1 block">Horarios</label>
                         <div className="grid grid-cols-2 gap-3 mb-3">
-                            <input name="origin" placeholder="Origen" defaultValue={data?.origin} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
-                            <input name="destination" placeholder="Destino" defaultValue={data?.destination} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
+                             <input name="departureTime" type="time" value={formData.departureTime || ''} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" placeholder="Salida" />
+                             <input name="arrivalTime" type="time" value={formData.arrivalTime || ''} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" placeholder="Llegada" />
                         </div>
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                             <input name="departureTime" type="time" defaultValue={data?.departureTime} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
-                             <input name="arrivalTime" type="time" defaultValue={data?.arrivalTime} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" />
-                        </div>
-                        <input name="operator" placeholder="Cooperativa" defaultValue={data?.operator} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
-                        <input name="busId" placeholder="Bus ID (Placa/Disco)" defaultValue={data?.busId} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
-                        <input name="price" type="number" placeholder="Precio" defaultValue={data?.price} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
+                        <label className="text-gray-400 text-sm mb-1 block">Estado</label>
+                        <select name="status" value={formData.status || 'active'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
+                            <option value="active">Disponible</option>
+                            <option value="inactive">No disponible</option>
+                        </select>
                     </>
                 );
             case 'user':

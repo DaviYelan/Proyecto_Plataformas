@@ -9,6 +9,10 @@ def proxy_request(method, endpoint, data=None):
         url = f"{API_URL}{endpoint}"
         headers = {'Content-Type': 'application/json'}
         
+        print(f"[PROXY] {method} {url}")
+        if data:
+            print(f"[PROXY] Data: {data}")
+        
         if method == 'GET':
             response = requests.get(url, headers=headers, timeout=10)
         elif method == 'POST':
@@ -19,9 +23,14 @@ def proxy_request(method, endpoint, data=None):
             response = requests.delete(url, headers=headers, timeout=10)
         else:
             return jsonify({"error": "Método no soportado"}), 400
+        
+        print(f"[PROXY] Response status: {response.status_code}")
+        if response.status_code >= 400:
+            print(f"[PROXY] Response text: {response.text}")
             
         return response.json(), response.status_code
     except requests.exceptions.RequestException as e:
+        print(f"[PROXY] Exception: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -102,6 +111,11 @@ def save_horario():
     result, status = proxy_request('POST', '/api/horario/guardar', request.json)
     return jsonify(result), status
 
+@router_api.route("/api/horario/actualizar", methods=["PUT"])
+def update_horario():
+    result, status = proxy_request('PUT', '/api/horario/actualizar', request.json)
+    return jsonify(result), status
+
 @router_api.route("/api/horario/eliminar/<int:id>", methods=["DELETE"])
 def delete_horario(id):
     result, status = proxy_request('DELETE', f'/api/horario/eliminar/{id}')
@@ -117,6 +131,11 @@ def get_escalas():
 @router_api.route("/api/escala/guardar", methods=["POST"])
 def save_escala():
     result, status = proxy_request('POST', '/api/escala/guardar', request.json)
+    return jsonify(result), status
+
+@router_api.route("/api/escala/actualizar", methods=["PUT"])
+def update_escala():
+    result, status = proxy_request('PUT', '/api/escala/actualizar', request.json)
     return jsonify(result), status
 
 @router_api.route("/api/escala/eliminar/<int:id>", methods=["DELETE"])
@@ -136,6 +155,11 @@ def save_descuento():
     result, status = proxy_request('POST', '/api/descuento/guardar', request.json)
     return jsonify(result), status
 
+@router_api.route("/api/descuento/actualizar", methods=["PUT"])
+def update_descuento():
+    result, status = proxy_request('PUT', '/api/descuento/actualizar', request.json)
+    return jsonify(result), status
+
 @router_api.route("/api/descuento/eliminar/<int:id>", methods=["DELETE"])
 def delete_descuento(id):
     result, status = proxy_request('DELETE', f'/api/descuento/eliminar/{id}')
@@ -153,6 +177,11 @@ def save_persona():
     result, status = proxy_request('POST', '/api/persona/guardar', request.json)
     return jsonify(result), status
 
+@router_api.route("/api/persona/actualizar", methods=["PUT"])
+def update_persona():
+    result, status = proxy_request('PUT', '/api/persona/actualizar', request.json)
+    return jsonify(result), status
+
 @router_api.route("/api/persona/eliminar/<int:id>", methods=["DELETE"])
 def delete_persona(id):
     result, status = proxy_request('DELETE', f'/api/persona/eliminar/{id}')
@@ -163,4 +192,14 @@ def delete_persona(id):
 @router_api.route("/api/boleto/lista", methods=["GET"])
 def get_boletos():
     result, status = proxy_request('GET', '/api/boleto/lista')
+    return jsonify(result), status
+
+@router_api.route("/api/boleto/guardar", methods=["POST"])
+def save_boleto():
+    result, status = proxy_request('POST', '/api/boleto/guardar', request.json)
+    return jsonify(result), status
+
+@router_api.route("/api/boleto/actualizar", methods=["PUT"])
+def update_boleto():
+    result, status = proxy_request('PUT', '/api/boleto/actualizar', request.json)
     return jsonify(result), status

@@ -11,15 +11,17 @@ export interface CooperativaBackend {
 }
 
 export interface BusBackend {
-  id_bus: number;
+  id_bus?: number;
   numero_bus: number;
   placa: string;
   marca: string;
   modelo: string;
   capacidad_pasajeros: number;
-  Velocidad: number;
+  Velocidad?: number;
+  velocidad?: number;
   estado_bus: string;
-  cooperativa: CooperativaBackend;
+  cooperativa?: CooperativaBackend;
+  cooperativa_id?: number;
 }
 
 export interface RutaBackend {
@@ -78,12 +80,14 @@ export interface BoletoBackend {
 }
 
 export interface DescuentoBackend {
-  id_descuento: number;
+  id_descuento?: number;
   nombre_descuento: string;
   descripcion: string;
   porcentaje: number;
   estado_descuento: string;
   tipo_descuento: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
 }
 
 export interface CuentaBackend {
@@ -94,7 +98,7 @@ export interface CuentaBackend {
 }
 
 export interface PersonaBackend {
-  id_persona: number;
+  id_persona?: number;
   tipo_identificacion: string;
   numero_identificacion: string;
   nombre: string;
@@ -106,7 +110,11 @@ export interface PersonaBackend {
   fecha_nacimiento: string;
   saldo_disponible: number;
   tipo_tarifa: string;
-  cuenta: CuentaBackend;
+  cuenta?: CuentaBackend;
+  usuario?: string;
+  contrasenia?: string;
+  estado_cuenta?: string;
+  tipo_cuenta?: string;
   metodo_pago?: MetodoPagoBackend;
 }
 
@@ -126,11 +134,15 @@ export const getCooperativas = async (): Promise<CooperativaBackend[]> => {
 
 export const saveCooperativa = async (cooperativa: Partial<CooperativaBackend>): Promise<boolean> => {
   try {
+    console.log('Guardando cooperativa:', cooperativa);
     const response = await fetch(`${API_BASE}/api/cooperativa/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(cooperativa)
     });
+    const data = await response.json();
+    console.log('Respuesta guardar cooperativa:', response.status, response.ok, data);
     return response.ok;
   } catch (error) {
     console.error('Error al guardar cooperativa:', error);
@@ -140,11 +152,15 @@ export const saveCooperativa = async (cooperativa: Partial<CooperativaBackend>):
 
 export const updateCooperativa = async (cooperativa: CooperativaBackend): Promise<boolean> => {
   try {
+    console.log('Actualizando cooperativa:', cooperativa);
     const response = await fetch(`${API_BASE}/api/cooperativa/actualizar`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(cooperativa)
     });
+    const data = await response.json();
+    console.log('Respuesta actualizar cooperativa:', response.status, response.ok, data);
     return response.ok;
   } catch (error) {
     console.error('Error al actualizar cooperativa:', error);
@@ -154,9 +170,13 @@ export const updateCooperativa = async (cooperativa: CooperativaBackend): Promis
 
 export const deleteCooperativa = async (id: number): Promise<boolean> => {
   try {
+    console.log('Eliminando cooperativa ID:', id);
     const response = await fetch(`${API_BASE}/api/cooperativa/eliminar/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
+    const data = await response.json();
+    console.log('Respuesta eliminar cooperativa:', response.status, response.ok, data);
     return response.ok;
   } catch (error) {
     console.error('Error al eliminar cooperativa:', error);
@@ -178,11 +198,26 @@ export const getBuses = async (): Promise<BusBackend[]> => {
 
 export const saveBus = async (bus: Partial<BusBackend>): Promise<boolean> => {
   try {
+    console.log('saveBus - Enviando:', JSON.stringify(bus, null, 2));
+    
     const response = await fetch(`${API_BASE}/api/bus/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(bus)
     });
+    console.log('saveBus - Respuesta status:', response.status);
+    
+    const responseText = await response.text();
+    if (responseText) {
+      try {
+        const responseData = JSON.parse(responseText);
+        console.log('saveBus - Respuesta JSON:', JSON.stringify(responseData, null, 2));
+      } catch (e) {
+        console.log('saveBus - Respuesta texto:', responseText);
+      }
+    }
+    
     return response.ok;
   } catch (error) {
     console.error('Error al guardar bus:', error);
@@ -192,11 +227,33 @@ export const saveBus = async (bus: Partial<BusBackend>): Promise<boolean> => {
 
 export const updateBus = async (bus: BusBackend): Promise<boolean> => {
   try {
+    console.log('updateBus - Enviando bus con campos:');
+    console.log('  - id_bus:', bus.id_bus);
+    console.log('  - placa:', bus.placa);
+    console.log('  - marca:', bus.marca);
+    console.log('  - modelo:', bus.modelo);
+    console.log('  - cooperativa_id:', bus.cooperativa_id);
+    console.log('  - cooperativa (objeto):', bus.cooperativa);
+    console.log('updateBus - Enviando:', JSON.stringify(bus, null, 2));
+    
     const response = await fetch(`${API_BASE}/api/bus/actualizar`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(bus)
     });
+    console.log('updateBus - Respuesta status:', response.status);
+    
+    const responseText = await response.text();
+    if (responseText) {
+      try {
+        const responseData = JSON.parse(responseText);
+        console.log('updateBus - Respuesta JSON:', JSON.stringify(responseData, null, 2));
+      } catch (e) {
+        console.log('updateBus - Respuesta texto:', responseText);
+      }
+    }
+    
     return response.ok;
   } catch (error) {
     console.error('Error al actualizar bus:', error);
@@ -207,7 +264,8 @@ export const updateBus = async (bus: BusBackend): Promise<boolean> => {
 export const deleteBus = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/bus/eliminar/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
     return response.ok;
   } catch (error) {
@@ -233,6 +291,7 @@ export const saveRuta = async (ruta: Partial<RutaBackend>): Promise<boolean> => 
     const response = await fetch(`${API_BASE}/api/ruta/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(ruta)
     });
     return response.ok;
@@ -247,6 +306,7 @@ export const updateRuta = async (ruta: RutaBackend): Promise<boolean> => {
     const response = await fetch(`${API_BASE}/api/ruta/actualizar`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(ruta)
     });
     return response.ok;
@@ -259,7 +319,8 @@ export const updateRuta = async (ruta: RutaBackend): Promise<boolean> => {
 export const deleteRuta = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/ruta/eliminar/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
     return response.ok;
   } catch (error) {
@@ -282,11 +343,25 @@ export const getHorarios = async (): Promise<HorarioBackend[]> => {
 
 export const saveHorario = async (horario: Partial<HorarioBackend>): Promise<boolean> => {
   try {
+    console.log('saveHorario - Enviando:', JSON.stringify(horario, null, 2));
     const response = await fetch(`${API_BASE}/api/horario/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(horario)
     });
+    console.log('saveHorario - Respuesta status:', response.status);
+    
+    const responseText = await response.text();
+    if (responseText) {
+      try {
+        const responseData = JSON.parse(responseText);
+        console.log('saveHorario - Respuesta JSON:', JSON.stringify(responseData, null, 2));
+      } catch (e) {
+        console.log('saveHorario - Respuesta texto:', responseText);
+      }
+    }
+    
     return response.ok;
   } catch (error) {
     console.error('Error al guardar horario:', error);
@@ -294,10 +369,39 @@ export const saveHorario = async (horario: Partial<HorarioBackend>): Promise<boo
   }
 };
 
+export const updateHorario = async (horario: HorarioBackend): Promise<boolean> => {
+  try {
+    console.log('updateHorario - Enviando:', JSON.stringify(horario, null, 2));
+    const response = await fetch(`${API_BASE}/api/horario/actualizar`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(horario)
+    });
+    console.log('updateHorario - Respuesta status:', response.status);
+    
+    const responseText = await response.text();
+    if (responseText) {
+      try {
+        const responseData = JSON.parse(responseText);
+        console.log('updateHorario - Respuesta JSON:', JSON.stringify(responseData, null, 2));
+      } catch (e) {
+        console.log('updateHorario - Respuesta texto:', responseText);
+      }
+    }
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Error al actualizar horario:', error);
+    return false;
+  }
+};
+
 export const deleteHorario = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/horario/eliminar/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
     return response.ok;
   } catch (error) {
@@ -318,6 +422,49 @@ export const getBoletos = async (): Promise<BoletoBackend[]> => {
   }
 };
 
+export const saveBoleto = async (boleto: Partial<BoletoBackend>): Promise<boolean> => {
+  try {
+    console.log('saveBoleto - Enviando:', JSON.stringify(boleto, null, 2));
+    const response = await fetch(`${API_BASE}/api/boleto/guardar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(boleto)
+    });
+    console.log('saveBoleto - Respuesta status:', response.status);
+    
+    const responseText = await response.text();
+    if (responseText) {
+      try {
+        const responseData = JSON.parse(responseText);
+        console.log('saveBoleto - Respuesta JSON:', JSON.stringify(responseData, null, 2));
+      } catch (e) {
+        console.log('saveBoleto - Respuesta texto:', responseText);
+      }
+    }
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Error al guardar boleto:', error);
+    return false;
+  }
+};
+
+export const updatePersona = async (persona: PersonaBackend): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_BASE}/api/persona/actualizar`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(persona)
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('Error al actualizar persona:', error);
+    return false;
+  }
+};
+
 // ========== ESCALAS ==========
 export const getEscalas = async (): Promise<EscalaBackend[]> => {
   try {
@@ -332,11 +479,14 @@ export const getEscalas = async (): Promise<EscalaBackend[]> => {
 
 export const saveEscala = async (escala: Partial<EscalaBackend>): Promise<boolean> => {
   try {
+    console.log('saveEscala - Enviando:', escala);
     const response = await fetch(`${API_BASE}/api/escala/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(escala)
     });
+    console.log('saveEscala - Respuesta status:', response.status);
     return response.ok;
   } catch (error) {
     console.error('Error al guardar escala:', error);
@@ -344,10 +494,26 @@ export const saveEscala = async (escala: Partial<EscalaBackend>): Promise<boolea
   }
 };
 
+export const updateEscala = async (escala: EscalaBackend): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_BASE}/api/escala/actualizar`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(escala)
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('Error al actualizar escala:', error);
+    return false;
+  }
+};
+
 export const deleteEscala = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/escala/eliminar/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
     return response.ok;
   } catch (error) {
@@ -370,11 +536,14 @@ export const getDescuentos = async (): Promise<DescuentoBackend[]> => {
 
 export const saveDescuento = async (descuento: Partial<DescuentoBackend>): Promise<boolean> => {
   try {
+    console.log('saveDescuento - Enviando:', descuento);
     const response = await fetch(`${API_BASE}/api/descuento/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(descuento)
     });
+    console.log('saveDescuento - Respuesta status:', response.status);
     return response.ok;
   } catch (error) {
     console.error('Error al guardar descuento:', error);
@@ -382,10 +551,26 @@ export const saveDescuento = async (descuento: Partial<DescuentoBackend>): Promi
   }
 };
 
+export const updateDescuento = async (descuento: DescuentoBackend): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_BASE}/api/descuento/actualizar`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(descuento)
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('Error al actualizar descuento:', error);
+    return false;
+  }
+};
+
 export const deleteDescuento = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/descuento/eliminar/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
     return response.ok;
   } catch (error) {
@@ -408,11 +593,14 @@ export const getPersonas = async (): Promise<PersonaBackend[]> => {
 
 export const savePersona = async (persona: Partial<PersonaBackend>): Promise<boolean> => {
   try {
+    console.log('savePersona - Enviando:', persona);
     const response = await fetch(`${API_BASE}/api/persona/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(persona)
     });
+    console.log('savePersona - Respuesta status:', response.status);
     return response.ok;
   } catch (error) {
     console.error('Error al guardar persona:', error);
@@ -423,7 +611,8 @@ export const savePersona = async (persona: Partial<PersonaBackend>): Promise<boo
 export const deletePersona = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/persona/eliminar/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
     return response.ok;
   } catch (error) {

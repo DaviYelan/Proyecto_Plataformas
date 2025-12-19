@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     // Cargar variables de entorno desde el .env del backend
-    const env = loadEnv(mode, '../../backend', '');
+    const env = loadEnv(mode, '../backend', '');
     return {
       server: {
         port: 3000,

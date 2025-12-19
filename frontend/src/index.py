@@ -22,4 +22,4 @@ else:
 app.config["SESSION_TYPE"] = getenv("FLASK_SESSION_TYPE", "filesystem")
 
 if __name__ == "__main__":
-    app.run(debug=False, use_reloader=False, host="0.0.0.0")
+    app.run(debug=True, use_reloader=False, host="0.0.0.0")

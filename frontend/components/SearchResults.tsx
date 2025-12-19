@@ -10,9 +10,10 @@ interface SearchResultsProps {
   onClose: () => void;
   onTicketPurchased: (ticket: Ticket) => void;
   user: User | null;
+  onUserUpdate?: (user: User) => void;
 }
 
-const SearchResults: React.FC<SearchResultsProps> = ({ results, searchParams, onClose, onTicketPurchased, user }) => {
+const SearchResults: React.FC<SearchResultsProps> = ({ results, searchParams, onClose, onTicketPurchased, user, onUserUpdate }) => {
   const [step, setStep] = useState<'list' | 'seats' | 'payment'>('list');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
@@ -117,6 +118,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ results, searchParams, on
           onSuccess={handlePaymentSuccess}
           user={user}
           tripDate={searchParams.departDate}
+          onUserUpdate={onUserUpdate}
         />
       </div>
     );

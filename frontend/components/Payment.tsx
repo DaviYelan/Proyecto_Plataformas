@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CreditCard, CheckCircle, Loader2, Bus, Plus, Wallet } from 'lucide-react';
 import { Trip, Seat, Ticket, User, PaymentMethod } from '../types';
+import * as api from '../services/apiService';
 
 interface PaymentProps {
   trip: Trip;
@@ -9,9 +10,10 @@ interface PaymentProps {
   onSuccess: (ticket: Ticket) => void;
   user: User | null;
   tripDate?: string;
+  onUserUpdate?: (user: User) => void;
 }
 
-const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSuccess, user, tripDate }) => {
+const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSuccess, user, tripDate, onUserUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [passengerName, setPassengerName] = useState(user?.name ? `${user.name} ${user.lastName || ''}`.trim() : '');
@@ -32,14 +34,21 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
     }
   }, [user]);
 
-  const handlePayment = (e: React.FormEvent) => {
+  const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      console.error('Usuario no autenticado');
+      alert('Debes iniciar sesión para comprar boletos');
+      onBack();
+      return;
+    }
+
     setLoading(true);
     
-    // Simulate API processing
-    setTimeout(() => {
-      setLoading(false);
-      setSuccess(true);
+    try {
+      // Simulate API processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       const ticket: Ticket = {
         id: `TKT-${Math.floor(Math.random() * 10000)}`,
@@ -50,8 +59,50 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
         totalPrice: totalPrice,
         tripDate: tripDate || new Date().toISOString().split('T')[0]
       };
+
+      // Guardar boleto en el backend para cada asiento
+      for (const seat of selectedSeats) {
+        const boleto: Partial<api.BoletoBackend> = {
+          fecha_compra: new Date().toISOString().split('T')[0],
+          numero_asiento: parseInt(seat.number),
+          cantidad_boleto: 1,
+          precio_final: trip.price,
+          estado_boleto: 'Pagado',
+          persona: {
+            id_persona: user.id,
+            usuario: user.email || '',
+            contrasenia: '',
+            estado_cuenta: 'Activo',
+            tipo_cuenta: 'Cliente',
+            cuenta: {}
+          } as api.PersonaBackend
+        };
+        console.log('Guardando boleto:', boleto);
+        const result = await api.saveBoleto(boleto);
+        if (!result) {
+          console.error('Error guardando boleto, posiblemente no autenticado');
+        }
+      }
+
+      // Actualizar saldo del usuario
+      const nuevoBalance = (user.balance || 0) - totalPrice;
+      console.log('Saldo anterior:', user.balance, 'Nuevo saldo:', nuevoBalance);
+      
+      if (onUserUpdate) {
+        onUserUpdate({
+          ...user,
+          balance: nuevoBalance
+        });
+      }
+
+      setLoading(false);
+      setSuccess(true);
       setCreatedTicket(ticket);
-    }, 2000);
+    } catch (error) {
+      console.error('Error en el pago:', error);
+      alert('Error al procesar el pago. Intenta de nuevo.');
+      setLoading(false);
+    }
   };
 
   const handleFinish = () => {
