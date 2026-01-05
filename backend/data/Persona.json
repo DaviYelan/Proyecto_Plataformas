@@ -150,27 +150,6 @@
     }
   },
   {
-    "id_persona": 6,
-    "tipo_identificacion": "Cedula",
-    "numero_identificacion": "1150567789",
-    "nombre": "Parque Lineal",
-    "apellido": "Betorl",
-    "genero": "No_definido",
-    "correo": "nerod@gmail.com",
-    "telefono": "",
-    "direccion": "",
-    "fecha_nacimiento": "02/02/2000",
-    "saldo_disponible": 0.0,
-    "tipo_tarifa": "General",
-    "cuenta": {
-      "id_cuenta": 6,
-      "correo": "nerod@gmail.com",
-      "contrasenia": "toyota45*",
-      "estado_cuenta": "Activo",
-      "tipo_cuenta": "Cliente"
-    }
-  },
-  {
     "id_persona": 7,
     "tipo_identificacion": "Cedula",
     "numero_identificacion": "1103819015",
@@ -239,7 +218,7 @@
     "genero": "Masculino",
     "correo": "luillis@gmail.com",
     "telefono": "098 762 6289",
-    "direccion": "Andrés Bello, Los Apuros, Loja, 110110, Ecuador",
+    "direccion": "Andrï¿½s Bello, Los Apuros, Loja, 110110, Ecuador",
     "fecha_nacimiento": "14/02/1950",
     "saldo_disponible": 4.5,
     "tipo_tarifa": "General",
@@ -402,6 +381,132 @@
       "fecha_vencimiento": "11/25",
       "codigo_seguridad": "1231",
       "opcion_pago": "Tarjeta_credito"
+    }
+  },
+  {
+    "id_persona": 16,
+    "tipo_identificacion": "Cedula",
+    "numero_identificacion": "google_176534061801ec57b7",
+    "nombre": "Gabriel",
+    "apellido": "Luna",
+    "genero": "No_definido",
+    "correo": "gluna4023@gmail.com",
+    "telefono": "",
+    "direccion": "",
+    "fecha_nacimiento": "01/01/1990",
+    "saldo_disponible": 0.0,
+    "tipo_tarifa": "General",
+    "cuenta": {
+      "id_cuenta": 17,
+      "correo": "gluna4023@gmail.com",
+      "contrasenia": "yO-k0pK7qLCzVAcc",
+      "estado_cuenta": "Activo",
+      "tipo_cuenta": "Cliente"
+    }
+  },
+  {
+    "id_persona": 17,
+    "tipo_identificacion": "Cedula",
+    "numero_identificacion": "google_176534067043244b73",
+    "nombre": "Stefania",
+    "apellido": "Luna",
+    "genero": "No_definido",
+    "correo": "stefanialuna2000@gmail.com",
+    "telefono": "",
+    "direccion": "",
+    "fecha_nacimiento": "01/01/1990",
+    "saldo_disponible": 0.0,
+    "tipo_tarifa": "General",
+    "cuenta": {
+      "id_cuenta": 18,
+      "correo": "stefanialuna2000@gmail.com",
+      "contrasenia": "juflOzjiaxllcPm8",
+      "estado_cuenta": "Activo",
+      "tipo_cuenta": "Cliente"
+    }
+  },
+  {
+    "id_persona": 18,
+    "tipo_identificacion": "Cedula",
+    "numero_identificacion": "google_1765340722238756ae",
+    "nombre": "Miguel",
+    "apellido": "Luna",
+    "genero": "No_definido",
+    "correo": "maiguelluna14@gmail.com",
+    "telefono": "",
+    "direccion": "",
+    "fecha_nacimiento": "01/01/1990",
+    "saldo_disponible": 0.0,
+    "tipo_tarifa": "General",
+    "cuenta": {
+      "id_cuenta": 19,
+      "correo": "maiguelluna14@gmail.com",
+      "contrasenia": "U95vYQtpPhjbtqs0",
+      "estado_cuenta": "Activo",
+      "tipo_cuenta": "Cliente"
+    }
+  },
+  {
+    "id_persona": 19,
+    "tipo_identificacion": "Cedula",
+    "numero_identificacion": "google_1765340764d9ebe1fd",
+    "nombre": "Miguel Angel",
+    "apellido": "Luna Yunga",
+    "genero": "No_definido",
+    "correo": "miguel.a.luna@unl.edu.ec",
+    "telefono": "",
+    "direccion": "",
+    "fecha_nacimiento": "01/01/1990",
+    "saldo_disponible": 0.0,
+    "tipo_tarifa": "General",
+    "cuenta": {
+      "id_cuenta": 20,
+      "correo": "miguel.a.luna@unl.edu.ec",
+      "contrasenia": "7iYNCttkrVg6FOr_",
+      "estado_cuenta": "Activo",
+      "tipo_cuenta": "Cliente"
+    }
+  },
+  {
+    "id_persona": 20,
+    "tipo_identificacion": "Cedula",
+    "numero_identificacion": "google_17653410335916cc0d",
+    "nombre": "Maiguel",
+    "apellido": "Luna",
+    "genero": "No_definido",
+    "correo": "maiguellun12@gmail.com",
+    "telefono": "",
+    "direccion": "",
+    "fecha_nacimiento": "01/01/1990",
+    "saldo_disponible": 0.0,
+    "tipo_tarifa": "General",
+    "cuenta": {
+      "id_cuenta": 21,
+      "correo": "maiguellun12@gmail.com",
+      "contrasenia": "k9KCURs_xgqnz7YN",
+      "estado_cuenta": "Activo",
+      "tipo_cuenta": "Cliente"
+    }
+  },
+  {
+    "id_persona": 21,
+    "tipo_identificacion": "Cedula",
+    "numero_identificacion": "google_1765341125d2c1cf09",
+    "nombre": "Maiguel",
+    "apellido": "Luna",
+    "genero": "No_definido",
+    "correo": "maiguelluna13@gmail.com",
+    "telefono": "",
+    "direccion": "",
+    "fecha_nacimiento": "01/01/1990",
+    "saldo_disponible": 0.0,
+    "tipo_tarifa": "General",
+    "cuenta": {
+      "id_cuenta": 22,
+      "correo": "maiguelluna13@gmail.com",
+      "contrasenia": "TLSBBSH2Gm5THnyH",
+      "estado_cuenta": "Activo",
+      "tipo_cuenta": "Cliente"
     }
   }
 ]

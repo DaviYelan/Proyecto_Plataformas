@@ -286,21 +286,21 @@
         "tiempo_estimado": "1h 12min",
         "estado_ruta": "Disponible",
         "bus": {
-          "id_bus": 1,
-          "numero_bus": 4981,
-          "placa": "ABC-125",
-          "marca": "Mercedes",
-          "modelo": "2024",
+          "id_bus": 2,
+          "numero_bus": 8165,
+          "placa": "BCD-125",
+          "marca": "Toyota",
+          "modelo": "2025",
           "capacidad_pasajeros": 40,
-          "Velocidad": 50,
+          "Velocidad": 60,
           "estado_bus": "Activo",
           "cooperativa": {
-            "id_cooperativa": 1,
-            "nombre_cooperativa": "Cooperativa de Cariamanga",
-            "ruc": "1105526180123",
-            "direccion": "Av.Reina del Cisne",
-            "telefono": "0989416578",
-            "correo_empresarial": "cooperativacariamanga@gmail.com"
+            "id_cooperativa": 2,
+            "nombre_cooperativa": "Cooperativa de Loja",
+            "ruc": "1105526180124",
+            "direccion": "Loja",
+            "telefono": "0989416579",
+            "correo_empresarial": "cooperativaloja@gmail.com"
           }
         }
       }

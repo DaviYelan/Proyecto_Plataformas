@@ -66,6 +66,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         setDiscounts(descuentoData.map(api.mapDescuento));
         setUsers(personaData.map(api.mapPersona));
         setBoletos(boletosData);
+        
+        console.log('Cooperativas cargadas:', coopData.map(api.mapCooperativa));
+        console.log('Buses cargados:', busData.map(api.mapBus));
       } catch (error) {
         console.error('Error al cargar datos:', error);
       } finally {
@@ -276,6 +279,61 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         
         case 'schedule': {
           const routeId = parseInt(formData.routeId) || 1;
+          const selectedCooperativeId = formData.cooperativeId;
+          
+          console.log('=== GUARDANDO HORARIO ===');
+          console.log('Cooperativa seleccionada:', selectedCooperativeId);
+          console.log('Ruta seleccionada:', routeId);
+          console.log('Cooperativas disponibles:', cooperatives);
+          console.log('Buses disponibles:', buses);
+          console.log('Rutas disponibles:', routesDef);
+          
+          // SIEMPRE actualizar la ruta con un bus de la cooperativa seleccionada
+          if (selectedCooperativeId && routeId) {
+            const currentRoute = routesDef.find(r => r.id === String(routeId));
+            const currentBus = currentRoute?.busId ? buses.find(b => b.id === currentRoute.busId) : null;
+            
+            console.log('Ruta actual:', currentRoute);
+            console.log('Bus actual de la ruta:', currentBus);
+            console.log('Cooperativa del bus actual:', currentBus?.cooperativeId);
+            
+            // Buscar un bus disponible de la cooperativa seleccionada
+            const newBus = buses.find(b => b.cooperativeId === selectedCooperativeId && b.status === 'active');
+            
+            console.log('Bus buscado para la cooperativa:', selectedCooperativeId);
+            console.log('Bus encontrado:', newBus);
+            
+            // Si no hay bus o es de otra cooperativa, actualizar la ruta
+            if (!currentBus || currentBus.cooperativeId !== selectedCooperativeId) {
+              if (newBus && currentRoute) {
+                console.log('Actualizando ruta con bus de la cooperativa seleccionada');
+                const rutaUpdateData: any = {
+                  id_ruta: parseInt(currentRoute.id),
+                  origen: currentRoute.origin,
+                  destino: currentRoute.destination,
+                  precio_unitario: currentRoute.basePrice || 0,
+                  distancia: currentRoute.distancekm || 0,
+                  tiempo_estimado: currentRoute.estimatedDuration,
+                  estado_ruta: 'Disponible',
+                  bus: { id_bus: parseInt(newBus.id) }
+                };
+                
+                console.log('Datos para actualizar ruta:', rutaUpdateData);
+                const updateResult = await api.updateRuta(rutaUpdateData);
+                console.log('Resultado de actualización de ruta:', updateResult);
+                
+                if (!updateResult) {
+                  console.error('Error al actualizar la ruta con el nuevo bus');
+                }
+              } else if (!newBus) {
+                console.error('No se encontró un bus disponible para la cooperativa seleccionada');
+                alert('No hay buses disponibles para la cooperativa "' + (cooperatives.find(c => c.id === selectedCooperativeId)?.name || selectedCooperativeId) + '". Por favor, crea un bus para esta cooperativa primero.');
+                return; // Detener el guardado
+              }
+            } else {
+              console.log('El bus de la ruta ya pertenece a la cooperativa seleccionada');
+            }
+          }
           
           if (isEditing) {
             // Para actualizar: enviar con id_horario
@@ -288,6 +346,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             };
             console.log('Datos de horario para actualizar:', updateData);
             success = await api.updateHorario(updateData as api.HorarioBackend);
+            
+            if (!success) {
+              console.error('Error al actualizar el horario');
+              alert('Error al actualizar el horario. Por favor verifica que no haya conflictos de horarios.');
+            }
           } else {
             // Para crear: no enviar id_horario
             const createData: Partial<api.HorarioBackend> = {
@@ -303,8 +366,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
           console.log('Resultado de guardar horario:', success);
           
           if (success) {
-            const horariosList = await api.getHorarios();
+            // Recargar horarios, cooperativas y buses para reflejar los cambios
+            const [horariosList, coopList, busList, rutasList] = await Promise.all([
+              api.getHorarios(),
+              api.getCooperativas(),
+              api.getBuses(),
+              api.getRutas()
+            ]);
             setSchedules(horariosList.map(api.mapHorario));
+            setCooperatives(coopList.map(api.mapCooperativa));
+            setBuses(busList.map(api.mapBus));
+            setRoutesDef(rutasList.map(api.mapRuta));
           }
           break;
         }
@@ -405,9 +477,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
       
       if (success) {
         setModalOpen(false);
+        setEditingItem(null);
         alert('¡Guardado exitosamente!');
       } else {
-        alert('Error al guardar. Por favor intente nuevamente.');
+        // No cerrar el modal para que el usuario pueda corregir los datos
+        alert('Error al guardar. Verifica:\n- Que los horarios no se solapen con otros turnos del mismo bus\n- Que la cooperativa tenga buses disponibles\n- Que todos los campos estén completos');
       }
     } catch (error) {
       console.error('Error en handleSaveItem:', error);
@@ -513,6 +587,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             type={modalType} 
             data={editingItem}
             cooperatives={cooperatives}
+            buses={buses}
             routesDef={routesDef}
             onClose={() => setModalOpen(false)} 
             onSave={handleSaveItem} 
@@ -976,10 +1051,26 @@ const AdminProfile = ({ user, onUpdate }: any) => {
     );
 };
 
-const ModalForm = ({ type, data, cooperatives, routesDef, onClose, onSave }: any) => {
+const ModalForm = ({ type, data, cooperatives, buses, routesDef, onClose, onSave }: any) => {
     const getInitialFormData = () => {
         // Si hay data para editar, usar esos datos
         if (data) {
+            // Para schedules, obtener la cooperativa desde la ruta asociada
+            if (type === 'schedule' && data.routeId) {
+                const route = routesDef.find(r => r.id === data.routeId);
+                if (route && route.busId) {
+                    const bus = buses.find(b => b.id === route.busId);
+                    if (bus && bus.cooperativeId) {
+                        return {
+                            ...data,
+                            cooperativeId: bus.cooperativeId,
+                            routeId: data.routeId || '1',
+                            status: data.status || 'active'
+                        };
+                    }
+                }
+            }
+            
             return {
                 ...data,
                 cooperativeId: data.cooperativeId || cooperatives[0]?.id?.toString() || '1',
@@ -994,7 +1085,7 @@ const ModalForm = ({ type, data, cooperatives, routesDef, onClose, onSave }: any
         }
         if (type === 'schedule') {
             return { 
-                routeId: '1', 
+                routeId: routesDef[0]?.id?.toString() || '1',
                 cooperativeId: cooperatives[0]?.id?.toString() || '1',
                 departureTime: '08:00',
                 arrivalTime: '12:00',
@@ -1056,21 +1147,40 @@ const ModalForm = ({ type, data, cooperatives, routesDef, onClose, onSave }: any
                         <input name="basePrice" type="number" placeholder="Precio Base" defaultValue={data?.basePrice} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3" />
                     </>
                 );
-            case 'schedule':
+            case 'schedule': {
+                // Obtener la cooperativa de la ruta seleccionada
+                const selectedRoute = formData.routeId ? routesDef.find(r => r.id === formData.routeId) : null;
+                const selectedBus = selectedRoute?.busId ? buses.find(b => b.id === selectedRoute.busId) : null;
+                const routeCooperativeId = selectedBus?.cooperativeId;
+                const routeCooperative = routeCooperativeId ? cooperatives.find(c => c.id === routeCooperativeId) : null;
+                
                 return (
                     <>
-                        <label className="text-gray-400 text-sm mb-1 block">Ruta (determina bus y cooperativa)</label>
-                        <select name="routeId" value={String(formData.routeId) || '1'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
+                        <label className="text-gray-400 text-sm mb-1 block">Cooperativa</label>
+                        <select name="cooperativeId" value={formData.cooperativeId || cooperatives[0]?.id || '1'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
+                            {cooperatives.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                        
+                        <label className="text-gray-400 text-sm mb-1 block">Ruta</label>
+                        <select name="routeId" value={String(formData.routeId) || ''} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
                             <option value="">Seleccionar Ruta</option>
                             {routesDef.map(route => (
                                 <option key={route.id} value={String(route.id)}>{route.origin} → {route.destination}</option>
                             ))}
                         </select>
+                        
+                        {routeCooperative && formData.cooperativeId !== routeCooperative.id && (
+                            <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 p-3 rounded mb-3 text-xs">
+                                ⚠️ La ruta seleccionada pertenece a "{routeCooperative.name}". Al guardar, se asociará con la cooperativa: "{cooperatives.find(c => c.id === formData.cooperativeId)?.name}"
+                            </div>
+                        )}
+                        
                         <label className="text-gray-400 text-sm mb-1 block">Horarios</label>
                         <div className="grid grid-cols-2 gap-3 mb-3">
                              <input name="departureTime" type="time" value={formData.departureTime || ''} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" placeholder="Salida" />
                              <input name="arrivalTime" type="time" value={formData.arrivalTime || ''} onChange={handleChange} className="bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white" placeholder="Llegada" />
                         </div>
+                        
                         <label className="text-gray-400 text-sm mb-1 block">Estado</label>
                         <select name="status" value={formData.status || 'active'} onChange={handleChange} className="w-full bg-[#2a2e2a] p-3 rounded border border-gray-700 text-white mb-3">
                             <option value="active">Disponible</option>
@@ -1078,6 +1188,7 @@ const ModalForm = ({ type, data, cooperatives, routesDef, onClose, onSave }: any
                         </select>
                     </>
                 );
+            }
             case 'user':
                 return (
                     <>

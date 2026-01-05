@@ -381,13 +381,21 @@ export const updateHorario = async (horario: HorarioBackend): Promise<boolean> =
     console.log('updateHorario - Respuesta status:', response.status);
     
     const responseText = await response.text();
+    let errorMessage = '';
+    
     if (responseText) {
       try {
         const responseData = JSON.parse(responseText);
         console.log('updateHorario - Respuesta JSON:', JSON.stringify(responseData, null, 2));
+        errorMessage = responseData.msg || responseData.error || '';
       } catch (e) {
         console.log('updateHorario - Respuesta texto:', responseText);
+        errorMessage = responseText;
       }
+    }
+    
+    if (!response.ok && errorMessage) {
+      alert('Error al actualizar horario: ' + errorMessage);
     }
     
     return response.ok;
@@ -646,6 +654,7 @@ export const mapBus = (b: BusBackend): BusUnit => ({
   capacity: b.capacidad_pasajeros,
   speedLimit: b.Velocidad,
   cooperative: b.cooperativa?.nombre_cooperativa || '',
+  cooperativeId: String(b.cooperativa?.id_cooperativa || ''),
   status: b.estado_bus === 'Activo' ? 'active' : 'inactive'
 });
 
@@ -656,6 +665,7 @@ export const mapRuta = (r: RutaBackend): RouteDefinition => ({
   distancekm: r.distancia,
   estimatedDuration: r.tiempo_estimado,
   basePrice: r.precio_unitario,
+  busId: r.bus?.id_bus ? String(r.bus.id_bus) : undefined,
   status: r.estado_ruta === 'Disponible' ? 'active' : 'inactive'
 });
 
