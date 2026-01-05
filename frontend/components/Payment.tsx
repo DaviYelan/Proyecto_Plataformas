@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CreditCard, CheckCircle, Loader2, Bus, Plus, Wallet } from 'lucide-react';
-import { Trip, Seat, Ticket, User, PaymentMethod } from '../types';
+import { Trip, Seat, Ticket, User } from '../types';
 import * as api from '../services/apiService';
 
 interface PaymentProps {
@@ -61,32 +61,94 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
       };
 
       // Guardar boleto en el backend para cada asiento
+      const boletosLocales: api.BoletoBackend[] = [];
       for (const seat of selectedSeats) {
+        const boletoId = Date.now() + Math.random();
         const boleto: Partial<api.BoletoBackend> = {
-          fecha_compra: new Date().toISOString().split('T')[0],
-          numero_asiento: parseInt(seat.number),
+          id_boleto: boletoId,
+          fecha_compra: new Date().toLocaleDateString('es-EC'),
+          numero_asiento: Number.parseInt(seat.number),
           cantidad_boleto: 1,
           precio_final: trip.price,
           estado_boleto: 'Pagado',
           persona: {
             id_persona: user.id,
+            tipo_identificacion: 'Cédula',
+            numero_identificacion: '',
+            nombre: user.name,
+            apellido: user.lastName || '',
+            genero: '',
+            correo: user.email || '',
+            telefono: '',
+            direccion: '',
+            fecha_nacimiento: '',
+            saldo_disponible: (user.balance || 0) - totalPrice,
+            tipo_tarifa: 'Normal',
             usuario: user.email || '',
             contrasenia: '',
             estado_cuenta: 'Activo',
-            tipo_cuenta: 'Cliente',
-            cuenta: {}
-          } as api.PersonaBackend
+            tipo_cuenta: 'Cliente'
+          } as api.PersonaBackend,
+          turno: {
+            id_turno: 0,
+            fecha_salida: tripDate || new Date().toLocaleDateString('es-EC'),
+            numero_turno: 1,
+            estado_turno: 'Activo',
+            horario: {
+              id_horario: 0,
+              hora_salida: trip.departureTime,
+              hora_llegada: trip.arrivalTime,
+              estado_horario: 'Activo',
+              ruta: {
+                id_ruta: 0,
+                origen: trip.origin,
+                destino: trip.destination,
+                precio_unitario: trip.price,
+                distancia: 0,
+                tiempo_estimado: trip.duration,
+                estado_ruta: 'Activo',
+                bus: {
+                  numero_bus: 0,
+                  placa: '',
+                  marca: '',
+                  modelo: '',
+                  capacidad_pasajeros: 40,
+                  estado_bus: 'Activo',
+                  cooperativa: {
+                    id_cooperativa: 0,
+                    nombre_cooperativa: trip.operator,
+                    ruc: '',
+                    direccion: '',
+                    telefono: '',
+                    correo_empresarial: ''
+                  }
+                }
+              }
+            }
+          }
         };
+        
         console.log('Guardando boleto:', boleto);
         const result = await api.saveBoleto(boleto);
         if (!result) {
-          console.error('Error guardando boleto, posiblemente no autenticado');
+          console.error('Error guardando boleto en backend, guardando en localStorage');
         }
+        
+        boletosLocales.push(boleto as api.BoletoBackend);
       }
+
+      // Guardar boletos en localStorage para persistencia
+      const existentesLocal = localStorage.getItem(`boletos_${user.email}`);
+      const boletosExistentes = existentesLocal ? JSON.parse(existentesLocal) : [];
+      const todosLosBoletosLocales = [...boletosExistentes, ...boletosLocales];
+      localStorage.setItem(`boletos_${user.email}`, JSON.stringify(todosLosBoletosLocales));
 
       // Actualizar saldo del usuario
       const nuevoBalance = (user.balance || 0) - totalPrice;
       console.log('Saldo anterior:', user.balance, 'Nuevo saldo:', nuevoBalance);
+      
+      // Guardar saldo en localStorage
+      localStorage.setItem(`user_balance_${user.email}`, String(nuevoBalance));
       
       if (onUserUpdate) {
         onUserUpdate({

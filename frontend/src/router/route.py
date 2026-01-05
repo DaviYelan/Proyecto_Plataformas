@@ -359,11 +359,17 @@ def iniciar_sesion():
         try:
             # Llamar al endpoint de autenticación del backend para validar credenciales y obtener token
             r = requests.post(f"{API_URL}/api/auth/login", json={"correo": correo, "contrasenia": contrasenia})
+            print(f'[iniciar_sesion] Backend response status: {r.status_code}')
+            print(f'[iniciar_sesion] Backend response text: {r.text}')
             if r.status_code == 200:
                 data = r.json()
+                print(f'[iniciar_sesion] Backend response JSON keys: {list(data.keys())}')
+                print(f'[iniciar_sesion] Token en respuesta: {data.get("token", "NO ESTÁ")}')
                 token = data.get("token")
+                print(f'[iniciar_sesion] Token extraído: {token[:50] if token else "NO TOKEN"}')
                 if token:
                     session["token"] = token
+                    print(f'[iniciar_sesion] Token guardado en sesión')
                 # Poblar session['user'] consultando persona asociada
                 personas_resp = backend_request('GET', f"/api/persona/lista")
                 if personas_resp.status_code == 200:
@@ -382,7 +388,7 @@ def iniciar_sesion():
                         
                         # Si es petición JSON, devolver datos del usuario
                         if is_json_request:
-                            return jsonify({
+                            response_data = {
                                 "id": user_data.get("id"),
                                 "nombre": user_data.get("nombre"),
                                 "apellido": user_data.get("apellido"),
@@ -390,7 +396,11 @@ def iniciar_sesion():
                                 "telefono": persona.get("telefono", ""),
                                 "rol": "admin" if cuenta.get("tipo_cuenta") == "Administrador" else "client",
                                 "tipo_cuenta": cuenta.get("tipo_cuenta"),
-                            }), 200
+                            }
+                            # Incluir el token en la respuesta JSON
+                            if token:
+                                response_data["token"] = token
+                            return jsonify(response_data), 200
                         
                         redirect_url = session.pop("redirect_after_login", None)
                         if redirect_url:

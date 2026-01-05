@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, Ticket, PaymentMethod } from '../types';
-import { LogOut, LayoutDashboard, Ticket as TicketIcon, User as UserIcon, Settings, Download, Trash2, Menu, X, CreditCard, Heart, Calendar, Clock, TrendingUp, MapPin, Plus, Check } from 'lucide-react';
+import { LogOut, LayoutDashboard, Ticket as TicketIcon, User as UserIcon, Settings, Download, Trash2, Menu, X, CreditCard, Heart, Calendar, Clock, TrendingUp, MapPin, Plus, Check, Wallet } from 'lucide-react';
 import * as api from '../services/apiService';
 import { jsPDF } from 'jspdf';
 
@@ -21,11 +21,15 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
   }, [user.balance, user.email]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpLoading, setTopUpLoading] = useState(false);
   
   // Estados para datos del backend
   const [boletosBackend, setBoletosBackend] = useState<api.BoletoBackend[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
   
   // Settings State
   const [settings, setSettings] = useState({
@@ -34,7 +38,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
       twoFactor: false
   });
   
-  // Cargar datos del backend
+  // Cargar datos del backend y localStorage
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -44,7 +48,20 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
         const userBoletos = boletos.filter(b => 
           b.persona?.correo?.toLowerCase() === user.email?.toLowerCase()
         );
-        setBoletosBackend(userBoletos);
+        
+        // Cargar boletos del localStorage para boletos recién comprados
+        const localStorageBoletos = localStorage.getItem(`boletos_${user.email}`);
+        const localBoletos = localStorageBoletos ? JSON.parse(localStorageBoletos) : [];
+        
+        // Combinar boletos del backend y localStorage, evitando duplicados
+        const allBoletos = [
+          ...userBoletos,
+          ...localBoletos.filter((lb: api.BoletoBackend) => 
+            !userBoletos.some(ub => ub.id_boleto === lb.id_boleto)
+          )
+        ];
+        
+        setBoletosBackend(allBoletos);
       } catch (error) {
         console.error('Error al cargar datos:', error);
       } finally {
@@ -52,7 +69,20 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
       }
     };
     fetchData();
-  }, [user.email]);
+  }, [user.email, refetchTrigger]);
+  
+  // Persiste el saldo del usuario en localStorage
+  useEffect(() => {
+    localStorage.setItem(`user_balance_${user.email}`, String(currentUserData.balance || 0));
+  }, [currentUserData.balance, user.email]);
+  
+  // Recargar boletos cuando cambian los tickets de la sesión
+  useEffect(() => {
+    if (tickets.length > 0) {
+      // Trigger refetch para sincronizar con backend
+      setRefetchTrigger(prev => prev + 1);
+    }
+  }, [tickets.length]);
   
   // Extraer método de pago del backend
   const backendPaymentMethod = useMemo(() => {
@@ -80,6 +110,16 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
       setPaymentMethods(user.paymentMethods);
     }
   }, [backendPaymentMethod, user.paymentMethods]);
+
+  // Función para refetch de boletos después de una compra
+  const triggerRefetchBoletos = () => {
+    setRefetchTrigger(prev => prev + 1);
+  };
+  
+  // Función para actualizar el saldo del usuario
+  const updateUserBalance = (newBalance: number) => {
+    setCurrentUserData(prev => ({ ...prev, balance: newBalance }));
+  };
 
   // Combinar boletos del backend con los comprados en esta sesión (tickets prop)
   const mappedPurchasedTickets = useMemo(() => {
@@ -122,16 +162,33 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
   const stats = useMemo(() => {
     const totalTrips = displayTickets.length;
     const now = new Date();
+    // Establecer la hora a las 00:00:00 para comparar solo fechas
+    now.setHours(0, 0, 0, 0);
+    
     const activeTickets = displayTickets.filter(b => {
       if (b.turno?.fecha_salida) {
-        const [day, month, year] = b.turno.fecha_salida.split('/');
-        const tripDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        return tripDate >= now;
+        try {
+          const [day, month, year] = b.turno.fecha_salida.split('/');
+          const tripDate = new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day));
+          tripDate.setHours(0, 0, 0, 0);
+          // Mostrar boletos cuya fecha de viaje sea hoy o en el futuro
+          return tripDate >= now;
+        } catch (error) {
+          console.error('Error al parsear fecha:', b.turno.fecha_salida, error);
+          return false;
+        }
       }
-      return true;
+      return false; // Si no tiene fecha de salida, no es un boleto activo
     });
     
-    const nextTrip = activeTickets.length > 0 ? activeTickets[0] : null;
+    // Ordenar por fecha más cercana
+    const sortedActiveTickets = activeTickets.sort((a, b) => {
+      const dateA = a.turno?.fecha_salida ? new Date(a.turno.fecha_salida.split('/').reverse().join('-')) : new Date();
+      const dateB = b.turno?.fecha_salida ? new Date(b.turno.fecha_salida.split('/').reverse().join('-')) : new Date();
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    const nextTrip = sortedActiveTickets.length > 0 ? sortedActiveTickets[0] : null;
     
     const routes = displayTickets.map(b => {
       if (b.turno?.horario?.ruta) {
@@ -162,6 +219,37 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
     e.preventDefault();
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleTopUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(topUpAmount);
+    
+    if (!topUpAmount || amount <= 0) {
+      alert('Ingresa un monto válido');
+      return;
+    }
+    
+    setTopUpLoading(true);
+    try {
+      // Simular procesamiento de transacción
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const newBalance = (currentUserData.balance || 0) + amount;
+      updateUserBalance(newBalance);
+      
+      // Guardar en localStorage
+      localStorage.setItem(`user_balance_${user.email}`, String(newBalance));
+      
+      alert(`¡Saldo recargado exitosamente! Nuevo saldo: $${newBalance.toFixed(2)}`);
+      setShowTopUpModal(false);
+      setTopUpAmount('');
+    } catch (error) {
+      console.error('Error al recargar saldo:', error);
+      alert('Error al procesar la recarga. Intenta de nuevo.');
+    } finally {
+      setTopUpLoading(false);
+    }
   };
 
   const handleDeleteCard = (id: number) => {
@@ -545,6 +633,28 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
               {activeTab === 'settings' && (
                  <div className="space-y-6 animate-in fade-in duration-300">
                     <h2 className="text-xl md:text-2xl font-bold text-white mb-4">Configuración</h2>
+                    
+                    {/* Sección de Cargar Saldo */}
+                    <div className="bg-gradient-to-r from-[#1e1e1e] to-[#252525] rounded-xl border border-[#2ecc71]/30 p-6 shadow-lg">
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+                        <div>
+                          <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-1"><Wallet className="text-[#2ecc71]" /> Saldo Disponible</h3>
+                          <p className="text-gray-400 text-sm">Recarga tu saldo para comprar más boletos</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-3xl font-bold text-[#2ecc71]">${currentUserData.balance?.toFixed(2) || '0.00'}</p>
+                          <p className="text-xs text-gray-500 mt-1">Saldo actual</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setShowTopUpModal(true)} 
+                        className="w-full bg-[#2ecc71] hover:bg-[#27ae60] text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
+                      >
+                        <Plus size={20} /> Recargar Saldo
+                      </button>
+                    </div>
+
+                    {/* Configuraciones */}
                     <div className="bg-[#1e1e1e] rounded-xl border border-gray-800 p-6 space-y-6">
                         <div className="flex items-center justify-between p-3 bg-[#2a2e2a] rounded-lg">
                             <div><h4 className="font-bold text-white text-sm md:text-base">Notificaciones de Viaje</h4><p className="text-xs text-gray-500">Recibir alertas sobre retrasos.</p></div>
@@ -580,6 +690,77 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
                       <div className="flex gap-4 pt-4">
                           <button type="button" onClick={() => setShowPaymentModal(false)} className="flex-1 py-2 text-gray-400 hover:text-white border border-gray-700 rounded-lg">Cancelar</button>
                           <button type="submit" className="flex-1 py-2 bg-[#2ecc71] hover:bg-[#27ae60] text-white font-bold rounded-lg">Agregar</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Top Up Saldo Modal */}
+      {showTopUpModal && (
+          <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+              <div className="bg-[#1e1e1e] rounded-2xl p-8 w-full max-w-md border border-gray-800 shadow-2xl">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-2xl font-bold text-white flex items-center gap-2"><Wallet className="text-[#2ecc71]" /> Recargar Saldo</h3>
+                    <button onClick={() => setShowTopUpModal(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+                  </div>
+
+                  <div className="bg-[#2a2e2a] p-4 rounded-lg mb-6 border border-gray-800">
+                    <p className="text-gray-400 text-xs uppercase font-bold mb-1">Saldo Actual</p>
+                    <p className="text-3xl font-bold text-[#2ecc71]">${currentUserData.balance?.toFixed(2) || '0.00'}</p>
+                  </div>
+
+                  <form onSubmit={handleTopUp} className="space-y-4">
+                      <div className="group">
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Monto a Recargar ($)</label>
+                        <input 
+                          type="number" 
+                          placeholder="50.00"
+                          value={topUpAmount}
+                          onChange={(e) => setTopUpAmount(e.target.value)}
+                          step="0.01"
+                          min="1"
+                          max="1000"
+                          className="w-full bg-[#2a2e2a] text-white border border-gray-700 rounded-lg px-4 py-3 text-sm focus:border-[#2ecc71] focus:ring-1 focus:ring-[#2ecc71] outline-none transition-all"
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-2">Mínimo: $1.00 | Máximo: $1,000.00</p>
+                      </div>
+
+                      <div className="bg-[#2a2e2a] p-3 rounded-lg border border-gray-800">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm text-gray-400">Nuevo Saldo:</span>
+                          <span className="text-lg font-bold text-[#2ecc71]">
+                            ${((currentUserData.balance || 0) + (Number.parseFloat(topUpAmount) || 0)).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4 pt-4">
+                          <button 
+                            type="button" 
+                            onClick={() => setShowTopUpModal(false)} 
+                            className="flex-1 py-3 text-gray-400 hover:text-white border border-gray-700 rounded-lg font-medium transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                          <button 
+                            type="submit" 
+                            disabled={topUpLoading}
+                            className="flex-1 py-3 bg-[#2ecc71] hover:bg-[#27ae60] disabled:bg-gray-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            {topUpLoading ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Procesando...
+                              </>
+                            ) : (
+                              <>
+                                <Plus size={18} />
+                                Recargar Saldo
+                              </>
+                            )}
+                          </button>
                       </div>
                   </form>
               </div>

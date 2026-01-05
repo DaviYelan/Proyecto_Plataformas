@@ -9,6 +9,11 @@ def proxy_request(method, endpoint, data=None):
         url = f"{API_URL}{endpoint}"
         headers = {'Content-Type': 'application/json'}
         
+        # Forward Authorization header from incoming request to backend
+        if 'Authorization' in request.headers:
+            headers['Authorization'] = request.headers['Authorization']
+            print(f"[PROXY] Forwarding Authorization header")
+        
         print(f"[PROXY] {method} {url}")
         if data:
             print(f"[PROXY] Data: {data}")
@@ -197,6 +202,11 @@ def get_boletos():
 @router_api.route("/api/boleto/guardar", methods=["POST"])
 def save_boleto():
     result, status = proxy_request('POST', '/api/boleto/guardar', request.json)
+    return jsonify(result), status
+
+@router_api.route("/api/boleto/comprar", methods=["POST"])
+def comprar_boleto():
+    result, status = proxy_request('POST', '/api/boleto/comprar', request.json)
     return jsonify(result), status
 
 @router_api.route("/api/boleto/actualizar", methods=["PUT"])

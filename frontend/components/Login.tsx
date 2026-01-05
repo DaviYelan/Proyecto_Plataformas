@@ -15,7 +15,9 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess, onSwitchToRegist
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const API_URL = "http://localhost:5000";
+  
+  // Use relative URL since React is served by Flask
+  const API_URL = window.location.origin;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +37,16 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess, onSwitchToRegist
 
       if (response.ok) {
         const userData = await response.json();
+        console.log('Login response completa:', userData);
+        console.log('Token en respuesta:', userData.token ? 'SÍ' : 'NO');
+        
+        // Guardar el token en localStorage si se devuelve
+        if (userData.token) {
+          localStorage.setItem('authToken', userData.token);
+          console.log('Token guardado en localStorage:', userData.token.substring(0, 50) + '...');
+        } else {
+          console.warn('No se devolvió token en la respuesta del servidor');
+        }
         
         // Obtener datos completos del usuario desde el backend
         try {

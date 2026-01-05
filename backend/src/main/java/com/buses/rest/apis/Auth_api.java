@@ -161,9 +161,15 @@ public class Auth_api {
                         return Response.status(Response.Status.UNAUTHORIZED).entity(response).build();
                     }
 
-                    // successful login: reset counters and persist
+                    // generar token
+                    Map<String, Object> claims = new HashMap<>();
+                    claims.put("roles", Collections.singletonList(c.getTipo_cuenta().name()));
+                    String token = JwtUtil.generateToken(c.getCorreo(), claims);
+                    
+                    // successful login: reset counters, set token, and persist
                     c.setFailedAttempts(0);
                     c.setLockedUntil(0L);
+                    c.setToken(token);
                     try {
                         cc.setCuenta(c);
                         cc.update();
@@ -171,10 +177,6 @@ public class Auth_api {
                         // ignore persistence error for login success
                     }
 
-                    // generar token
-                    Map<String, Object> claims = new HashMap<>();
-                    claims.put("roles", Collections.singletonList(c.getTipo_cuenta().name()));
-                    String token = JwtUtil.generateToken(c.getCorreo(), claims);
                     response.put("token", token);
                     response.put("user", c);
                     return Response.ok(response).build();

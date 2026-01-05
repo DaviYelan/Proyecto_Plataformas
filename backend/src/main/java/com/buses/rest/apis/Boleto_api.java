@@ -71,7 +71,7 @@ public class Boleto_api {
     @SuppressWarnings("unchecked")
     @Path("/guardar")
     @POST
-    @Secured(roles = {"ADMIN"})
+    @Secured(roles = {"ADMIN", "CLIENTE"})
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response save(HashMap<String, Object> map) {
@@ -365,6 +365,73 @@ public class Boleto_api {
         }
         catch (Exception e) {
             return false;
+        }
+    }
+
+    /**
+     * Endpoint simplificado para compra de boletos desde el cliente React
+     * Solo requiere: persona.id_persona, numero_asiento, precio_final
+     */
+    @Path("/comprar")
+    @POST
+    @Secured(roles = {"ADMIN", "CLIENTE"})
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response comprar(HashMap<String, Object> map) {
+        HashMap<String, Object> response = new HashMap<>();
+        Controlador_boleto cb = new Controlador_boleto();
+        Controlador_persona cp = new Controlador_persona();
+        try {
+            SimpleDateFormat formatoFecha = new SimpleDateFormat("dd/MM/yyyy");
+            String fechaCompra = formatoFecha.format(new Date());
+            
+            // Extraer datos del request
+            HashMap<String, Object> personaMap = (HashMap<String, Object>) map.get("persona");
+            Integer personaId = Integer.parseInt(personaMap.get("id_persona").toString());
+            Integer numeroAsiento = Integer.parseInt(map.get("numero_asiento").toString());
+            Float precioFinal = Float.parseFloat(map.get("precio_final").toString());
+            String estadoBoleto = (String) map.getOrDefault("estado_boleto", "Pagado");
+            
+            Persona persona = cp.get(personaId);
+            if (persona == null) {
+                response.put("msg", "Persona no encontrada");
+                return Response.status(Response.Status.NOT_FOUND).entity(response).build();
+            }
+            
+            // Verificar saldo
+            if (persona.getSaldo_disponible() < precioFinal) {
+                response.put("msg", "Saldo insuficiente");
+                return Response.status(Response.Status.BAD_REQUEST).entity(response).build();
+            }
+            
+            // Crear y guardar boleto
+            Boleto boleto = new Boleto();
+            boleto.setFecha_compra(fechaCompra);
+            boleto.setNumero_asiento(numeroAsiento);
+            boleto.setCantidad_boleto(1);
+            boleto.setPrecio_final(precioFinal);
+            boleto.setEstado_boleto(Estado_boleto.valueOf(estadoBoleto));
+            boleto.setPersona(persona);
+            // turno y descuento son opcionales para compra simple
+            
+            cb.setBoleto(boleto);
+            if (cb.save()) {
+                // Actualizar saldo de la persona
+                persona.setSaldo_disponible(persona.getSaldo_disponible() - precioFinal);
+                cp.setPersona(persona);
+                cp.update();
+                
+                response.put("msg", "Boleto comprado exitosamente");
+                response.put("boleto", boleto);
+                return Response.status(Response.Status.CREATED).entity(response).build();
+            } else {
+                response.put("msg", "Error al guardar el boleto");
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(response).build();
+            }
+        } catch (Exception e) {
+            response.put("msg", "Error: " + e.getMessage());
+            e.printStackTrace();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(response).build();
         }
     }
 }
