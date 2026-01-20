@@ -42,6 +42,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [boletos, setBoletos] = useState<api.BoletoBackend[]>([]);
 
+  // Función para recargar boletos
+  const refreshBoletos = async () => {
+    try {
+      console.log('Recargando boletos...');
+      const boletosData = await api.getBoletos();
+      setBoletos(boletosData);
+      console.log('Boletos recargados:', boletosData.length);
+    } catch (error) {
+      console.error('Error al recargar boletos:', error);
+    }
+  };
+
+  // Auto-actualizar boletos cada 30 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshBoletos();
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Cargar datos del backend al iniciar
   useEffect(() => {
     const loadData = async () => {
@@ -577,6 +598,52 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         {activeTab === 'users' && <ManageUsers data={users} onAdd={() => handleAdd('user')} onEdit={(item: any) => handleEdit('user', item)} onDelete={(id: string) => handleDelete(setUsers, id, 'user')} />}
         {activeTab === 'scales' && <ManageScales data={scales} onAdd={() => handleAdd('scale')} onEdit={(item: any) => handleEdit('scale', item)} onDelete={(id: string) => handleDelete(setScales, id, 'scale')} />}
         {activeTab === 'discounts' && <ManageDiscounts data={discounts} onAdd={() => handleAdd('discount')} onEdit={(item: any) => handleEdit('discount', item)} onDelete={(id: string) => handleDelete(setDiscounts, id, 'discount')} />}
+        {activeTab === 'tickets' && (
+          <div className="bg-[#1e1e1e] rounded-xl border border-gray-800 p-6">
+            <h2 className="text-2xl font-bold text-white mb-6">Gestión de Boletos</h2>
+            <div className="text-sm text-gray-400 mb-4">Se actualiza automáticamente cada 30 segundos</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="px-4 py-3 text-gray-300 font-semibold">ID</th>
+                    <th className="px-4 py-3 text-gray-300 font-semibold">Cliente</th>
+                    <th className="px-4 py-3 text-gray-300 font-semibold">Ruta</th>
+                    <th className="px-4 py-3 text-gray-300 font-semibold">Asiento</th>
+                    <th className="px-4 py-3 text-gray-300 font-semibold">Precio</th>
+                    <th className="px-4 py-3 text-gray-300 font-semibold">Estado</th>
+                    <th className="px-4 py-3 text-gray-300 font-semibold">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {boletos.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-6 text-center text-gray-400">No hay boletos registrados</td>
+                    </tr>
+                  ) : (
+                    boletos.map((boleto) => (
+                      <tr key={boleto.id_boleto} className="border-b border-gray-700 hover:bg-gray-800/50 transition-colors">
+                        <td className="px-4 py-3 text-gray-300">{boleto.id_boleto}</td>
+                        <td className="px-4 py-3 text-gray-300">{boleto.persona?.nombre} {boleto.persona?.apellido}</td>
+                        <td className="px-4 py-3 text-gray-300">{boleto.turno?.horario?.ruta?.origen} → {boleto.turno?.horario?.ruta?.destino}</td>
+                        <td className="px-4 py-3 text-[#2ecc71] font-semibold">{boleto.numero_asiento}</td>
+                        <td className="px-4 py-3 text-gray-300">${boleto.precio_final.toFixed(2)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                            boleto.estado_boleto === 'Activo' ? 'bg-green-900/30 text-green-400' : 'bg-gray-900/30 text-gray-400'
+                          }`}>
+                            {boleto.estado_boleto}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-400 text-sm">{new Date(boleto.fecha_compra).toLocaleDateString()}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         {activeTab === 'settings' && <ManageSettings />}
         {activeTab === 'profile' && <AdminProfile user={currentAdmin} onUpdate={(d: any) => setCurrentAdmin(prev => ({...prev, ...d}))} />}
       </main>

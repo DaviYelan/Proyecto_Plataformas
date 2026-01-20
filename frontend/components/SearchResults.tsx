@@ -11,9 +11,10 @@ interface SearchResultsProps {
   onTicketPurchased: (ticket: Ticket) => void;
   user: User | null;
   onUserUpdate?: (user: User) => void;
+  onShowLogin?: () => void;
 }
 
-const SearchResults: React.FC<SearchResultsProps> = ({ results, searchParams, onClose, onTicketPurchased, user, onUserUpdate }) => {
+const SearchResults: React.FC<SearchResultsProps> = ({ results, searchParams, onClose, onTicketPurchased, user, onUserUpdate, onShowLogin }) => {
   const [step, setStep] = useState<'list' | 'seats' | 'payment'>('list');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
@@ -79,6 +80,15 @@ const SearchResults: React.FC<SearchResultsProps> = ({ results, searchParams, on
   };
 
   const handleTripSelect = (trip: Trip) => {
+    // Verificar si el usuario está loggeado
+    if (!user) {
+      // Si no está loggeado, llamar a onShowLogin
+      if (onShowLogin) {
+        onShowLogin();
+      }
+      return;
+    }
+    // Si está loggeado, continuar con la selección
     setSelectedTrip(trip);
     setStep('seats');
   };

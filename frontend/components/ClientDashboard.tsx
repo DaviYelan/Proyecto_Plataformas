@@ -232,15 +232,23 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
     
     setTopUpLoading(true);
     try {
-      // Simular procesamiento de transacción
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const newBalance = (currentUserData.balance || 0) + amount;
+      const rechargeResult = await api.rechargeSaldo(Number(user.id), amount);
+
+      if (!rechargeResult.ok) {
+        const errorMsg = rechargeResult.error || 'No se pudo recargar el saldo en el servidor. Intenta de nuevo.';
+        console.error('Error recarga:', errorMsg);
+        alert(`Error: ${errorMsg}`);
+        return;
+      }
+
+      const newBalance = rechargeResult.saldo ?? (currentUserData.balance || 0) + amount;
       updateUserBalance(newBalance);
-      
-      // Guardar en localStorage
       localStorage.setItem(`user_balance_${user.email}`, String(newBalance));
-      
+
+      if (rechargeResult.persona) {
+        setCurrentUserData(prev => ({ ...prev, balance: newBalance }));
+      }
+
       alert(`¡Saldo recargado exitosamente! Nuevo saldo: $${newBalance.toFixed(2)}`);
       setShowTopUpModal(false);
       setTopUpAmount('');

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User, Check } from 'lucide-react';
 import { Trip, Seat } from '../types';
+import * as api from '../services/apiService';
 
 interface SeatSelectionProps {
   trip: Trip;
@@ -9,15 +10,15 @@ interface SeatSelectionProps {
 }
 
 const SeatSelection: React.FC<SeatSelectionProps> = ({ trip, onBack, onNext }) => {
-  // Mock generation of seats
-  const generateSeats = (): Seat[] => {
+  // Mock generation of seats with initial state
+  const generateSeats = (occupiedSeatNumbers: number[] = []): Seat[] => {
     const seats: Seat[] = [];
     const totalSeats = 40;
     for (let i = 1; i <= totalSeats; i++) {
       seats.push({
         id: `seat-${i}`,
         number: `${i}`,
-        status: Math.random() > 0.7 ? 'occupied' : 'available', // Random occupancy
+        status: occupiedSeatNumbers.includes(i) ? 'occupied' : 'available',
         isWindow: i % 4 === 1 || i % 4 === 0,
         floor: 1
       });
@@ -26,6 +27,51 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({ trip, onBack, onNext }) =
   };
 
   const [seats, setSeats] = useState<Seat[]>(generateSeats());
+  const [occupiedSeats, setOccupiedSeats] = useState<number[]>([]);
+
+  // Cargar boletos comprados al montar el componente
+  useEffect(() => {
+    const loadOccupiedSeats = async () => {
+      try {
+        const boletos = await api.getBoletos();
+        
+        // Filtrar boletos por la ruta del viaje (origen, destino)
+        const filteredBoletos = boletos.filter(boleto => {
+          const turno = boleto.turno;
+          if (!turno) return false;
+          
+          const horario = turno.horario;
+          if (!horario) return false;
+          
+          const ruta = horario.ruta;
+          if (!ruta) return false;
+          
+          // Comparar origen y destino
+          return (
+            ruta.origen.toLowerCase() === trip.origin.toLowerCase() &&
+            ruta.destino.toLowerCase() === trip.destination.toLowerCase()
+          );
+        });
+
+        // Extraer números de asientos ocupados
+        const occupiedNumbers = filteredBoletos
+          .map(boleto => boleto.numero_asiento)
+          .filter(numero => numero !== null && numero !== undefined);
+
+        console.log('Boletos encontrados para', trip.origin, '-', trip.destination, ':', filteredBoletos.length);
+        console.log('Asientos ocupados:', occupiedNumbers);
+
+        setOccupiedSeats(occupiedNumbers);
+        setSeats(generateSeats(occupiedNumbers));
+      } catch (error) {
+        console.error('Error al cargar asientos ocupados:', error);
+        // Si hay error, usar generación normal
+        setSeats(generateSeats());
+      }
+    };
+
+    loadOccupiedSeats();
+  }, [trip.origin, trip.destination]);
   
   const toggleSeat = (seatId: string) => {
     setSeats(prev => prev.map(seat => {

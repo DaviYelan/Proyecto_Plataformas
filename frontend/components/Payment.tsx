@@ -17,7 +17,13 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [passengerName, setPassengerName] = useState(user?.name ? `${user.name} ${user.lastName || ''}`.trim() : '');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCVC, setCardCVC] = useState('');
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
+  const [saveCardModal, setSaveCardModal] = useState(false);
+  const [shouldSaveCard, setShouldSaveCard] = useState(false);
+  const [cardValidationErrors, setCardValidationErrors] = useState<{[key: string]: string}>({});
 
   // Saved Card State
   const savedCards = user?.paymentMethods || [];
@@ -34,8 +40,96 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
     }
   }, [user]);
 
+  // Validar número de tarjeta (Luhn algorithm)
+  const validateCardNumber = (number: string): boolean => {
+    const cleaned = number.replace(/\s+/g, '');
+    if (cleaned.length !== 16) return false;
+    if (!/^\d+$/.test(cleaned)) return false;
+    
+    // Luhn algorithm
+    let sum = 0;
+    let isEven = false;
+    for (let i = cleaned.length - 1; i >= 0; i--) {
+      let digit = parseInt(cleaned[i], 10);
+      if (isEven) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      isEven = !isEven;
+    }
+    return sum % 10 === 0;
+  };
+
+  // Validar expiración
+  const validateExpiry = (expiry: string): boolean => {
+    if (!/^\d{2}\/\d{2}$/.test(expiry)) return false;
+    const [month, year] = expiry.split('/');
+    const m = parseInt(month, 10);
+    const y = parseInt(year, 10) + 2000;
+    if (m < 1 || m > 12) return false;
+    
+    const now = new Date();
+    const expDate = new Date(y, m - 1);
+    return expDate > now;
+  };
+
+  // Validar CVC
+  const validateCVC = (cvc: string): boolean => {
+    return /^\d{3,4}$/.test(cvc);
+  };
+
+  // Validar formulario
+  const validatePaymentForm = (): boolean => {
+    const errors: {[key: string]: string} = {};
+    
+    if (!passengerName.trim()) {
+      errors.name = 'El nombre es requerido';
+    }
+    
+    if (!validateCardNumber(cardNumber)) {
+      errors.card = 'Número de tarjeta inválido';
+    }
+    
+    if (!validateExpiry(cardExpiry)) {
+      errors.expiry = 'Expiración debe ser MM/YY y válida';
+    }
+    
+    if (!validateCVC(cardCVC)) {
+      errors.cvc = 'CVC debe tener 3 o 4 dígitos';
+    }
+    
+    setCardValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Formatear número de tarjeta
+  const formatCardNumber = (value: string) => {
+    const cleaned = value.replace(/\s+/g, '').replace(/\D/g, '');
+    const formatted = cleaned.replace(/(\d{4})(?=\d)/g, '$1 ');
+    setCardNumber(formatted);
+  };
+
+  // Formatear expiración
+  const formatExpiry = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length >= 2) {
+      setCardExpiry(cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4));
+    } else {
+      setCardExpiry(cleaned);
+    }
+  };
+
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar si es tarjeta nueva
+    if (!useSavedCard) {
+      if (!validatePaymentForm()) {
+        alert('Por favor completa correctamente todos los campos de la tarjeta');
+        return;
+      }
+    }
     
     if (!user) {
       console.error('Usuario no autenticado');
@@ -60,94 +154,97 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
         tripDate: tripDate || new Date().toISOString().split('T')[0]
       };
 
-      // Guardar boleto en el backend para cada asiento
-      const boletosLocales: api.BoletoBackend[] = [];
-      for (const seat of selectedSeats) {
-        const boletoId = Date.now() + Math.random();
-        const boleto: Partial<api.BoletoBackend> = {
-          id_boleto: boletoId,
-          fecha_compra: new Date().toLocaleDateString('es-EC'),
-          numero_asiento: Number.parseInt(seat.number),
-          cantidad_boleto: 1,
-          precio_final: trip.price,
-          estado_boleto: 'Pagado',
-          persona: {
-            id_persona: user.id,
-            tipo_identificacion: 'Cédula',
-            numero_identificacion: '',
-            nombre: user.name,
-            apellido: user.lastName || '',
-            genero: '',
-            correo: user.email || '',
-            telefono: '',
-            direccion: '',
-            fecha_nacimiento: '',
-            saldo_disponible: (user.balance || 0) - totalPrice,
-            tipo_tarifa: 'Normal',
-            usuario: user.email || '',
-            contrasenia: '',
-            estado_cuenta: 'Activo',
-            tipo_cuenta: 'Cliente'
-          } as api.PersonaBackend,
-          turno: {
-            id_turno: 0,
-            fecha_salida: tripDate || new Date().toLocaleDateString('es-EC'),
-            numero_turno: 1,
-            estado_turno: 'Activo',
-            horario: {
-              id_horario: 0,
-              hora_salida: trip.departureTime,
-              hora_llegada: trip.arrivalTime,
-              estado_horario: 'Activo',
-              ruta: {
-                id_ruta: 0,
-                origen: trip.origin,
-                destino: trip.destination,
-                precio_unitario: trip.price,
-                distancia: 0,
-                tiempo_estimado: trip.duration,
-                estado_ruta: 'Activo',
-                bus: {
-                  numero_bus: 0,
-                  placa: '',
-                  marca: '',
-                  modelo: '',
-                  capacidad_pasajeros: 40,
-                  estado_bus: 'Activo',
-                  cooperativa: {
-                    id_cooperativa: 0,
-                    nombre_cooperativa: trip.operator,
-                    ruc: '',
-                    direccion: '',
-                    telefono: '',
-                    correo_empresarial: ''
-                  }
+      // Guardar boletos en el backend de forma correcta
+      const numerosAsientos = selectedSeats.map(seat => Number.parseInt(seat.number));
+      
+      // Usar el turnId del viaje si está disponible
+      const turnId = trip.turnId || 1;
+      
+      const boletoData: Partial<api.BoletoBackend> = {
+        asientos: numerosAsientos,
+        precio_unitario: trip.price,
+        persona: {
+          id_persona: Number(user.id),
+          tipo_identificacion: 'Cédula',
+          numero_identificacion: '',
+          nombre: user.name,
+          apellido: user.lastName || '',
+          genero: '',
+          correo: user.email || '',
+          telefono: user.phone || '',
+          direccion: '',
+          fecha_nacimiento: '',
+          saldo_disponible: (user.balance || 0) - totalPrice,
+          tipo_tarifa: 'Normal',
+          usuario: user.email || '',
+          contrasenia: '',
+          estado_cuenta: 'Activo',
+          tipo_cuenta: 'Cliente'
+        } as api.PersonaBackend,
+        turno: {
+          id_turno: turnId,
+          fecha_salida: tripDate || new Date().toLocaleDateString('es-EC'),
+          numero_turno: 1,
+          estado_turno: 'Activo',
+          horario: {
+            id_horario: 0,
+            hora_salida: trip.departureTime,
+            hora_llegada: trip.arrivalTime,
+            estado_horario: 'Activo',
+            ruta: {
+              id_ruta: 0,
+              origen: trip.origin,
+              destino: trip.destination,
+              precio_unitario: trip.price,
+              distancia: 0,
+              tiempo_estimado: trip.duration,
+              estado_ruta: 'Activo',
+              bus: {
+                numero_bus: 0,
+                placa: '',
+                marca: '',
+                modelo: '',
+                capacidad_pasajeros: 40,
+                estado_bus: 'Activo',
+                cooperativa: {
+                  id_cooperativa: 0,
+                  nombre_cooperativa: trip.operator,
+                  ruc: '',
+                  direccion: '',
+                  telefono: '',
+                  correo_empresarial: ''
                 }
               }
             }
           }
-        };
-        
-        console.log('Guardando boleto:', boleto);
-        const result = await api.saveBoleto(boleto);
-        if (!result) {
-          console.error('Error guardando boleto en backend, guardando en localStorage');
-        }
-        
-        boletosLocales.push(boleto as api.BoletoBackend);
+        } as any
+      };
+
+      console.log('Guardando boletos. Asientos:', numerosAsientos, 'Turno ID:', turnId);
+      const result = await api.saveBoleto(boletoData);
+
+      if (!result.ok) {
+        const backendMsg = result.data?.msg || 'No se pudo guardar el boleto';
+        alert(backendMsg);
+        setLoading(false);
+        return;
       }
 
-      // Guardar boletos en localStorage para persistencia
-      const existentesLocal = localStorage.getItem(`boletos_${user.email}`);
-      const boletosExistentes = existentesLocal ? JSON.parse(existentesLocal) : [];
-      const todosLosBoletosLocales = [...boletosExistentes, ...boletosLocales];
-      localStorage.setItem(`boletos_${user.email}`, JSON.stringify(todosLosBoletosLocales));
+      let nuevoBalance = result.data?.saldo_restante;
 
-      // Actualizar saldo del usuario
-      const nuevoBalance = (user.balance || 0) - totalPrice;
+      // Si el backend no devolvió saldo, consultar la persona para mantener consistencia
+      if (nuevoBalance === undefined && user.id) {
+        const personaBackend = await api.getPersonaById(Number(user.id));
+        nuevoBalance = personaBackend?.saldo_disponible;
+      }
+
+      // Fallback al cálculo local en caso de que el backend no envíe saldo
+      if (nuevoBalance === undefined) {
+        nuevoBalance = (user.balance || 0) - totalPrice;
+      }
+
       console.log('Saldo anterior:', user.balance, 'Nuevo saldo:', nuevoBalance);
-      
-      // Guardar saldo en localStorage
+
       localStorage.setItem(`user_balance_${user.email}`, String(nuevoBalance));
       
       if (onUserUpdate) {
@@ -158,8 +255,15 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
       }
 
       setLoading(false);
-      setSuccess(true);
-      setCreatedTicket(ticket);
+      
+      // Si es tarjeta nueva y no se ha guardado, mostrar modal
+      if (!useSavedCard) {
+        setSaveCardModal(true);
+        setCreatedTicket(ticket);
+      } else {
+        setSuccess(true);
+        setCreatedTicket(ticket);
+      }
     } catch (error) {
       console.error('Error en el pago:', error);
       alert('Error al procesar el pago. Intenta de nuevo.');
@@ -294,10 +398,14 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
                               type="text" 
                               required 
                               value={passengerName}
-                              onChange={(e) => setPassengerName(e.target.value)}
+                              onChange={(e) => {
+                                setPassengerName(e.target.value);
+                                if (cardValidationErrors.name) setCardValidationErrors({...cardValidationErrors, name: ''});
+                              }}
                               placeholder="Ej. Juan Pérez" 
-                              className="w-full bg-[#2a2e2a] border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-[#2ecc71] focus:ring-1 focus:ring-[#2ecc71] outline-none transition-colors placeholder-gray-600" 
+                              className={`w-full bg-[#2a2e2a] border rounded-xl px-4 py-3.5 text-white focus:border-[#2ecc71] focus:ring-1 focus:ring-[#2ecc71] outline-none transition-colors placeholder-gray-600 ${cardValidationErrors.name ? 'border-red-500' : 'border-gray-700'}`}
                             />
+                            {cardValidationErrors.name && <p className="text-red-500 text-xs mt-1">{cardValidationErrors.name}</p>}
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Número de tarjeta</label>
@@ -306,11 +414,17 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
                                 <input 
                                   type="text" 
                                   required 
+                                  value={cardNumber}
+                                  onChange={(e) => {
+                                    formatCardNumber(e.target.value);
+                                    if (cardValidationErrors.card) setCardValidationErrors({...cardValidationErrors, card: ''});
+                                  }}
                                   maxLength={19}
                                   placeholder="0000 0000 0000 0000" 
-                                  className="w-full bg-[#2a2e2a] border border-gray-700 rounded-xl pl-12 pr-4 py-3.5 text-white focus:border-[#2ecc71] focus:ring-1 focus:ring-[#2ecc71] outline-none transition-colors placeholder-gray-600 font-mono" 
+                                  className={`w-full bg-[#2a2e2a] border rounded-xl pl-12 pr-4 py-3.5 text-white focus:border-[#2ecc71] focus:ring-1 focus:ring-[#2ecc71] outline-none transition-colors placeholder-gray-600 font-mono ${cardValidationErrors.card ? 'border-red-500' : 'border-gray-700'}`}
                                 />
                             </div>
+                            {cardValidationErrors.card && <p className="text-red-500 text-xs mt-1">{cardValidationErrors.card}</p>}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
@@ -318,20 +432,33 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
                                 <input 
                                   type="text" 
                                   required 
+                                  value={cardExpiry}
+                                  onChange={(e) => {
+                                    formatExpiry(e.target.value);
+                                    if (cardValidationErrors.expiry) setCardValidationErrors({...cardValidationErrors, expiry: ''});
+                                  }}
                                   placeholder="MM/YY" 
                                   maxLength={5}
-                                  className="w-full bg-[#2a2e2a] border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-[#2ecc71] focus:ring-1 focus:ring-[#2ecc71] outline-none transition-colors placeholder-gray-600 text-center" 
+                                  className={`w-full bg-[#2a2e2a] border rounded-xl px-4 py-3.5 text-white focus:border-[#2ecc71] focus:ring-1 focus:ring-[#2ecc71] outline-none transition-colors placeholder-gray-600 text-center ${cardValidationErrors.expiry ? 'border-red-500' : 'border-gray-700'}`}
                                 />
+                                {cardValidationErrors.expiry && <p className="text-red-500 text-xs mt-1">{cardValidationErrors.expiry}</p>}
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">CVC</label>
                                 <input 
                                   type="text" 
                                   required 
+                                  value={cardCVC}
+                                  onChange={(e) => {
+                                    const value = e.target.value.replace(/\D/g, '');
+                                    setCardCVC(value);
+                                    if (cardValidationErrors.cvc) setCardValidationErrors({...cardValidationErrors, cvc: ''});
+                                  }}
                                   placeholder="123" 
-                                  maxLength={3}
-                                  className="w-full bg-[#2a2e2a] border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-[#2ecc71] focus:ring-1 focus:ring-[#2ecc71] outline-none transition-colors placeholder-gray-600 text-center" 
+                                  maxLength={4}
+                                  className={`w-full bg-[#2a2e2a] border rounded-xl px-4 py-3.5 text-white focus:border-[#2ecc71] focus:ring-1 focus:ring-[#2ecc71] outline-none transition-colors placeholder-gray-600 text-center ${cardValidationErrors.cvc ? 'border-red-500' : 'border-gray-700'}`}
                                 />
+                                {cardValidationErrors.cvc && <p className="text-red-500 text-xs mt-1">{cardValidationErrors.cvc}</p>}
                             </div>
                         </div>
                       </>
@@ -403,6 +530,50 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
             </div>
         </div>
       </div>
+
+      {/* Save Card Modal */}
+      {saveCardModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1e1e1e] border border-gray-800 rounded-2xl max-w-sm w-full shadow-2xl">
+            <div className="p-6 md:p-8">
+              <div className="w-12 h-12 bg-[#2ecc71]/10 rounded-full flex items-center justify-center mb-4">
+                <Wallet className="h-6 w-6 text-[#2ecc71]" />
+              </div>
+              
+              <h3 className="text-xl font-bold text-white mb-2">Guardar tarjeta</h3>
+              <p className="text-gray-400 text-sm mb-6">¿Deseas guardar esta tarjeta para futuros pagos? Podrás usar tarjetas guardadas sin ingresar los datos nuevamente.</p>
+              
+              <div className="bg-[#2a2e2a] p-4 rounded-xl mb-6 border border-gray-700">
+                <p className="text-xs text-gray-500 uppercase font-bold mb-2">Tarjeta a guardar</p>
+                <p className="text-white font-mono text-sm">•••• •••• •••• {cardNumber.slice(-4)}</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setSaveCardModal(false);
+                    setSuccess(true);
+                  }}
+                  className="flex-1 px-4 py-3 rounded-xl font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors"
+                >
+                  No, después
+                </button>
+                <button
+                  onClick={() => {
+                    setShouldSaveCard(true);
+                    setSuccess(true);
+                    setSaveCardModal(false);
+                    // TODO: Save card to backend when shouldSaveCard is true
+                  }}
+                  className="flex-1 px-4 py-3 rounded-xl font-medium bg-[#2ecc71] hover:bg-[#27ae60] text-white transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="h-4 w-4" /> Sí, guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

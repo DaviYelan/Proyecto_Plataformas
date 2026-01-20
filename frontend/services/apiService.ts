@@ -1,6 +1,89 @@
-const API_BASE = '';
+// Use configurable backend base; default empty string keeps relative calls (served by same origin/proxy)
+const API_BASE = import.meta.env.VITE_API_BASE || '';
+// If pointing to another origin (API_BASE set), avoid sending cookies to bypass CORS with wildcard
+const CREDENTIALS_MODE: RequestCredentials = API_BASE ? 'omit' : 'include';
 
-// Tipos de respuesta del backend
+// ============================================
+// API ERROR HANDLING
+// ============================================
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public statusText: string,
+    public data?: any,
+    message?: string
+  ) {
+    super(message || `API Error: ${status} ${statusText}`);
+    this.name = 'ApiError';
+  }
+}
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Enhanced fetch with retry logic and error handling
+async function apiFetch<T>(
+  url: string, 
+  options: RequestInit = {}, 
+  retries = MAX_RETRIES
+): Promise<T> {
+  try {
+    const response = await fetch(`${API_BASE}${url}`, {
+      ...options,
+      credentials: CREDENTIALS_MODE,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+
+    // Handle non-2xx responses
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = await response.text();
+      }
+      
+      throw new ApiError(
+        response.status,
+        response.statusText,
+        errorData,
+        errorData?.message || `Request failed with status ${response.status}`
+      );
+    }
+
+    // Handle empty responses
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json();
+    }
+    
+    return await response.text() as T;
+  } catch (error) {
+    // Retry logic for network errors
+    if (retries > 0 && error instanceof TypeError) {
+      console.warn(`Network error, retrying... (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})`);
+      await sleep(RETRY_DELAY);
+      return apiFetch<T>(url, options, retries - 1);
+    }
+    
+    // Re-throw ApiError or wrap unknown errors
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    
+    throw new ApiError(0, 'Network Error', null, error instanceof Error ? error.message : 'Unknown error');
+  }
+}
+
+// ============================================
+// TIPOS DE RESPUESTA DEL BACKEND
+// ============================================
 export interface CooperativaBackend {
   id_cooperativa: number;
   nombre_cooperativa: string;
@@ -68,12 +151,14 @@ export interface MetodoPagoBackend {
 }
 
 export interface BoletoBackend {
-  id_boleto: number;
-  fecha_compra: string;
-  numero_asiento: number;
-  cantidad_boleto: number;
-  precio_final: number;
-  estado_boleto: string;
+  id_boleto?: number;
+  fecha_compra?: string;
+  numero_asiento?: number;
+  cantidad_boleto?: number;
+  precio_final?: number;
+  precio_unitario?: number;
+  estado_boleto?: string;
+  asientos?: number[]; // Para guardar múltiples asientos de una vez
   persona: PersonaBackend;
   turno?: TurnoBackend;
   descuento?: DescuentoBackend;
@@ -138,7 +223,7 @@ export const saveCooperativa = async (cooperativa: Partial<CooperativaBackend>):
     const response = await fetch(`${API_BASE}/api/cooperativa/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(cooperativa)
     });
     const data = await response.json();
@@ -156,7 +241,7 @@ export const updateCooperativa = async (cooperativa: CooperativaBackend): Promis
     const response = await fetch(`${API_BASE}/api/cooperativa/actualizar`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(cooperativa)
     });
     const data = await response.json();
@@ -173,7 +258,7 @@ export const deleteCooperativa = async (id: number): Promise<boolean> => {
     console.log('Eliminando cooperativa ID:', id);
     const response = await fetch(`${API_BASE}/api/cooperativa/eliminar/${id}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: CREDENTIALS_MODE
     });
     const data = await response.json();
     console.log('Respuesta eliminar cooperativa:', response.status, response.ok, data);
@@ -203,7 +288,7 @@ export const saveBus = async (bus: Partial<BusBackend>): Promise<boolean> => {
     const response = await fetch(`${API_BASE}/api/bus/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(bus)
     });
     console.log('saveBus - Respuesta status:', response.status);
@@ -239,7 +324,7 @@ export const updateBus = async (bus: BusBackend): Promise<boolean> => {
     const response = await fetch(`${API_BASE}/api/bus/actualizar`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(bus)
     });
     console.log('updateBus - Respuesta status:', response.status);
@@ -265,7 +350,7 @@ export const deleteBus = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/bus/eliminar/${id}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: CREDENTIALS_MODE
     });
     return response.ok;
   } catch (error) {
@@ -291,7 +376,7 @@ export const saveRuta = async (ruta: Partial<RutaBackend>): Promise<boolean> => 
     const response = await fetch(`${API_BASE}/api/ruta/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(ruta)
     });
     return response.ok;
@@ -306,7 +391,7 @@ export const updateRuta = async (ruta: RutaBackend): Promise<boolean> => {
     const response = await fetch(`${API_BASE}/api/ruta/actualizar`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(ruta)
     });
     return response.ok;
@@ -320,7 +405,7 @@ export const deleteRuta = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/ruta/eliminar/${id}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: CREDENTIALS_MODE
     });
     return response.ok;
   } catch (error) {
@@ -347,7 +432,7 @@ export const saveHorario = async (horario: Partial<HorarioBackend>): Promise<boo
     const response = await fetch(`${API_BASE}/api/horario/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(horario)
     });
     console.log('saveHorario - Respuesta status:', response.status);
@@ -375,7 +460,7 @@ export const updateHorario = async (horario: HorarioBackend): Promise<boolean> =
     const response = await fetch(`${API_BASE}/api/horario/actualizar`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(horario)
     });
     console.log('updateHorario - Respuesta status:', response.status);
@@ -409,7 +494,7 @@ export const deleteHorario = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/horario/eliminar/${id}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: CREDENTIALS_MODE
     });
     return response.ok;
   } catch (error) {
@@ -430,31 +515,45 @@ export const getBoletos = async (): Promise<BoletoBackend[]> => {
   }
 };
 
-export const saveBoleto = async (boleto: Partial<BoletoBackend>): Promise<boolean> => {
+export const saveBoleto = async (
+  boleto: Partial<BoletoBackend>
+): Promise<{ ok: boolean; status: number; data?: any }> => {
   try {
     console.log('saveBoleto - Enviando:', JSON.stringify(boleto, null, 2));
+    const token = localStorage.getItem('authToken');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json'
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('saveBoleto - Token agregado al header');
+    } else {
+      console.warn('saveBoleto - No se encontró token en localStorage');
+    }
+
     const response = await fetch(`${API_BASE}/api/boleto/guardar`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers,
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(boleto)
     });
-    console.log('saveBoleto - Respuesta status:', response.status);
-    
-    const responseText = await response.text();
-    if (responseText) {
+
+    const raw = await response.text();
+    let parsed: any = undefined;
+    if (raw) {
       try {
-        const responseData = JSON.parse(responseText);
-        console.log('saveBoleto - Respuesta JSON:', JSON.stringify(responseData, null, 2));
+        parsed = JSON.parse(raw);
+        console.log('saveBoleto - Respuesta JSON:', JSON.stringify(parsed, null, 2));
       } catch (e) {
-        console.log('saveBoleto - Respuesta texto:', responseText);
+        console.log('saveBoleto - Respuesta texto:', raw);
       }
     }
-    
-    return response.ok;
+
+    return { ok: response.ok, status: response.status, data: parsed };
   } catch (error) {
     console.error('Error al guardar boleto:', error);
-    return false;
+    return { ok: false, status: 500 };
   }
 };
 
@@ -463,13 +562,64 @@ export const updatePersona = async (persona: PersonaBackend): Promise<boolean> =
     const response = await fetch(`${API_BASE}/api/persona/actualizar`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(persona)
     });
     return response.ok;
   } catch (error) {
     console.error('Error al actualizar persona:', error);
     return false;
+  }
+};
+
+export const getPersonaById = async (id: number): Promise<PersonaBackend | null> => {
+  try {
+    const response = await fetch(`${API_BASE}/api/persona/lista/${id}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return (data.persona as PersonaBackend) || null;
+  } catch (error) {
+    console.error('Error al obtener persona por ID:', error);
+    return null;
+  }
+};
+
+export const rechargeSaldo = async (
+  id_persona: number,
+  monto: number
+): Promise<{ ok: boolean; saldo?: number; persona?: PersonaBackend; error?: string }> => {
+  try {
+    console.log('Recargando saldo:', { id_persona, monto });
+    
+    const response = await fetch(`${API_BASE}/api/persona/recargar-saldo`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: CREDENTIALS_MODE,
+      body: JSON.stringify({ id_persona, monto })
+    });
+
+    const data = await response.json();
+    console.log('Respuesta recarga saldo:', { status: response.status, data });
+    
+    if (!response.ok) {
+      console.error('Error en respuesta:', data);
+      return {
+        ok: false,
+        error: data?.msg || `Error ${response.status}`
+      };
+    }
+
+    return {
+      ok: response.ok,
+      saldo: data?.saldo_disponible,
+      persona: data?.persona
+    };
+  } catch (error) {
+    console.error('Error al recargar saldo:', error);
+    return { 
+      ok: false, 
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
   }
 };
 
@@ -521,7 +671,7 @@ export const deleteEscala = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/escala/eliminar/${id}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: CREDENTIALS_MODE
     });
     return response.ok;
   } catch (error) {
@@ -548,7 +698,7 @@ export const saveDescuento = async (descuento: Partial<DescuentoBackend>): Promi
     const response = await fetch(`${API_BASE}/api/descuento/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(descuento)
     });
     console.log('saveDescuento - Respuesta status:', response.status);
@@ -564,7 +714,7 @@ export const updateDescuento = async (descuento: DescuentoBackend): Promise<bool
     const response = await fetch(`${API_BASE}/api/descuento/actualizar`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(descuento)
     });
     return response.ok;
@@ -578,7 +728,7 @@ export const deleteDescuento = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/descuento/eliminar/${id}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: CREDENTIALS_MODE
     });
     return response.ok;
   } catch (error) {
@@ -605,7 +755,7 @@ export const savePersona = async (persona: Partial<PersonaBackend>): Promise<boo
     const response = await fetch(`${API_BASE}/api/persona/guardar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      credentials: CREDENTIALS_MODE,
       body: JSON.stringify(persona)
     });
     console.log('savePersona - Respuesta status:', response.status);
@@ -620,7 +770,7 @@ export const deletePersona = async (id: number): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE}/api/persona/eliminar/${id}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: CREDENTIALS_MODE
     });
     return response.ok;
   } catch (error) {
@@ -669,7 +819,7 @@ export const mapRuta = (r: RutaBackend): RouteDefinition => ({
   status: r.estado_ruta === 'Disponible' ? 'active' : 'inactive'
 });
 
-export const mapHorario = (h: HorarioBackend): Trip => ({
+export const mapHorario = (h: HorarioBackend | any): Trip => ({
   id: String(h.id_horario),
   origin: h.ruta?.origen || '',
   destination: h.ruta?.destino || '',
@@ -683,6 +833,7 @@ export const mapHorario = (h: HorarioBackend): Trip => ({
   amenities: [],
   routeId: String(h.ruta?.id_ruta || ''),
   busId: String(h.ruta?.bus?.id_bus || ''),
+  turnId: h._turno?.id_turno || 1, // Usar el turnId del turno enriquecido o por defecto 1
   status: h.estado_horario === 'Disponible' ? 'active' : 'cancelled'
 });
 
@@ -726,9 +877,16 @@ export const mapPersona = (p: PersonaBackend): User => ({
 // ========== BÚSQUEDA DE VIAJES ==========
 export const searchTrips = async (origin: string, destination: string): Promise<HorarioBackend[]> => {
   try {
-    const horariosResp = await fetch(`${API_BASE}/api/horario/lista`);
+    const [horariosResp, turnosResp] = await Promise.all([
+      fetch(`${API_BASE}/api/horario/lista`),
+      fetch(`${API_BASE}/api/turno/lista`)
+    ]);
+    
     const horariosData = await horariosResp.json();
+    const turnosData = await turnosResp.json();
+    
     const horarios: HorarioBackend[] = horariosData.horarios || [];
+    const turnos: any[] = turnosData.turnos || [];
     
     // Filtrar horarios por origen y destino
     const filtered = horarios.filter(h => {
@@ -741,7 +899,14 @@ export const searchTrips = async (origin: string, destination: string): Promise<
       return matchOrigin && matchDestination && h.estado_horario === 'Disponible';
     });
     
-    return filtered;
+    // Enriquecer horarios con turno ID
+    const enrichedHorarios = filtered.map(horario => ({
+      ...horario,
+      // Buscar el primer turno que coincida con este horario
+      _turno: turnos.find(t => t.horario?.id_horario === horario.id_horario)
+    }));
+    
+    return enrichedHorarios;
   } catch (error) {
     console.error('Error al buscar viajes:', error);
     return [];

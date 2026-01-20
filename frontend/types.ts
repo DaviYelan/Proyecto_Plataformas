@@ -43,6 +43,7 @@ export interface Trip {
   amenities: string[];
   routeId?: string; // Link to the physical route
   busId?: string;
+  turnId?: number; // ID del turno (para guardar boletos)
   status?: 'active' | 'delayed' | 'cancelled' | 'completed';
 }
 

@@ -5,14 +5,15 @@ import Hero from './Hero';
 import Destinations from './Destinations';
 import Features from './Features';
 import Footer from './Footer';
-import TravelAssistant from './TravelAssistant';
-import SearchResults from './SearchResults';
-import MyTickets from './MyTickets';
-import Help from './Help';
-import Login from './Login';
-import Register from './Register';
-import AdminDashboard from './AdminDashboard';
-import ClientDashboard from './ClientDashboard';
+import ReactLazy = React.lazy;
+const TravelAssistant = ReactLazy(() => import('./TravelAssistant'));
+const SearchResults = ReactLazy(() => import('./SearchResults'));
+const MyTickets = ReactLazy(() => import('./MyTickets'));
+const Help = ReactLazy(() => import('./Help'));
+const Login = ReactLazy(() => import('./Login'));
+const Register = ReactLazy(() => import('./Register'));
+const AdminDashboard = ReactLazy(() => import('./AdminDashboard'));
+const ClientDashboard = ReactLazy(() => import('./ClientDashboard'));
 import { SearchParams, Trip, Ticket, User } from '../types';
 import * as api from '../services/apiService';
 
@@ -357,7 +358,11 @@ const App: React.FC = () => {
   // RENDER VIEWS
 
   if (view === 'admin' && currentUser?.role === 'admin') {
-    return <AdminDashboard user={currentUser} onLogout={handleLogout} />;
+    return (
+      <React.Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando panel de administrador...</div>}>
+        <AdminDashboard user={currentUser} onLogout={handleLogout} />
+      </React.Suspense>
+    );
   }
 
   if (view === 'client' && currentUser) {
@@ -372,13 +377,19 @@ const App: React.FC = () => {
           onLoginClick={() => {}}
           onDashboardClick={() => {}} // Already on dashboard
         />
-        <ClientDashboard 
-          user={currentUser} 
-          tickets={purchasedTickets} 
-          onLogout={handleLogout}
-          onGoHome={() => setView('landing')}
-        />
-        {showHelp && <Help onClose={() => setShowHelp(false)} />}
+        <React.Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando tu panel...</div>}>
+          <ClientDashboard 
+            user={currentUser} 
+            tickets={purchasedTickets} 
+            onLogout={handleLogout}
+            onGoHome={() => setView('landing')}
+          />
+        </React.Suspense>
+        {showHelp && (
+          <React.Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando ayuda...</div>}>
+            <Help onClose={() => setShowHelp(false)} />
+          </React.Suspense>
+        )}
       </>
     );
   }
@@ -411,52 +422,68 @@ const App: React.FC = () => {
         <Features />
       </main>
       <Footer />
-      <TravelAssistant />
+      <React.Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando asistente de viaje...</div>}>
+        <TravelAssistant />
+      </React.Suspense>
 
       {/* Overlays */}
       {isSearchOpen && currentSearchParams && (
-        <SearchResults 
-          results={filteredTrips} 
-          searchParams={currentSearchParams} 
-          onClose={() => setIsSearchOpen(false)}
-          onTicketPurchased={handleTicketPurchased}
-          user={currentUser}
-          onUserUpdate={setCurrentUser}
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando resultados...</div>}>
+          <SearchResults 
+            results={filteredTrips} 
+            searchParams={currentSearchParams} 
+            onClose={() => setIsSearchOpen(false)}
+            onTicketPurchased={handleTicketPurchased}
+            user={currentUser}
+            onUserUpdate={setCurrentUser}
+            onShowLogin={() => {
+              setIsSearchOpen(false);
+              setShowLogin(true);
+            }}
+          />
+        </React.Suspense>
       )}
 
       {/* Only show simplified MyTickets if not logged in, otherwise redirect to dashboard */}
       {showMyTickets && !currentUser && (
-        <MyTickets 
-          tickets={purchasedTickets} 
-          onClose={() => setShowMyTickets(false)} 
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando boletos...</div>}>
+          <MyTickets 
+            tickets={purchasedTickets} 
+            onClose={() => setShowMyTickets(false)} 
+          />
+        </React.Suspense>
       )}
 
       {showHelp && (
-        <Help onClose={() => setShowHelp(false)} />
+        <React.Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando ayuda...</div>}>
+          <Help onClose={() => setShowHelp(false)} />
+        </React.Suspense>
       )}
 
       {showLogin && (
-        <Login 
-          onClose={() => setShowLogin(false)} 
-          onLoginSuccess={handleLoginSuccess}
-          onSwitchToRegister={() => {
-            setShowLogin(false);
-            setShowRegister(true);
-          }}
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando inicio de sesión...</div>}>
+          <Login 
+            onClose={() => setShowLogin(false)} 
+            onLoginSuccess={handleLoginSuccess}
+            onSwitchToRegister={() => {
+              setShowLogin(false);
+              setShowRegister(true);
+            }}
+          />
+        </React.Suspense>
       )}
 
       {showRegister && (
-        <Register 
-          onClose={() => setShowRegister(false)}
-          onRegisterSuccess={handleLoginSuccess}
-          onSwitchToLogin={() => {
-            setShowRegister(false);
-            setShowLogin(true);
-          }}
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando registro...</div>}>
+          <Register 
+            onClose={() => setShowRegister(false)}
+            onRegisterSuccess={handleLoginSuccess}
+            onSwitchToLogin={() => {
+              setShowRegister(false);
+              setShowLogin(true);
+            }}
+          />
+        </React.Suspense>
       )}
     </div>
   );

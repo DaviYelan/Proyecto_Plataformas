@@ -13,7 +13,8 @@ public class CORSFilter implements ContainerResponseFilter {
     public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) throws IOException {
         String origin = System.getenv("FRONTEND_ORIGIN");
         if (origin == null || origin.trim().isEmpty()) {
-            origin = "*"; // fallback for dev tools (no cookies expected)
+            // Default to local frontend for credentials-based calls
+            origin = "http://localhost:5000";
         }
 
         responseContext.getHeaders().putSingle("Access-Control-Allow-Origin", origin);

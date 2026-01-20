@@ -130,7 +130,7 @@
     "telefono": "",
     "direccion": "",
     "fecha_nacimiento": "02/02/2000",
-    "saldo_disponible": 82.0,
+    "saldo_disponible": 95.0,
     "tipo_tarifa": "General",
     "cuenta": {
       "id_cuenta": 5,
@@ -147,6 +147,27 @@
       "fecha_vencimiento": "12/30",
       "codigo_seguridad": "3333",
       "opcion_pago": "Tarjeta_credito"
+    }
+  },
+  {
+    "id_persona": 6,
+    "tipo_identificacion": "Cedula",
+    "numero_identificacion": "1150567789",
+    "nombre": "Parque Lineal",
+    "apellido": "Betorl",
+    "genero": "No_definido",
+    "correo": "nerod@gmail.com",
+    "telefono": "",
+    "direccion": "",
+    "fecha_nacimiento": "02/02/2000",
+    "saldo_disponible": 0.0,
+    "tipo_tarifa": "General",
+    "cuenta": {
+      "id_cuenta": 6,
+      "correo": "nerod@gmail.com",
+      "contrasenia": "toyota45*",
+      "estado_cuenta": "Activo",
+      "tipo_cuenta": "Cliente"
     }
   },
   {
@@ -499,7 +520,7 @@
     "telefono": "",
     "direccion": "",
     "fecha_nacimiento": "01/01/1990",
-    "saldo_disponible": 0.0,
+    "saldo_disponible": 50.0,
     "tipo_tarifa": "General",
     "cuenta": {
       "id_cuenta": 22,
