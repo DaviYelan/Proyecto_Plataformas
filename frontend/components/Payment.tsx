@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CreditCard, CheckCircle, Loader2, Bus, Plus, Wallet } from 'lucide-react';
 import { Trip, Seat, Ticket, User } from '../types';
 import * as api from '../services/apiService';
+import { useToast } from './ui/Toast';
 
 interface PaymentProps {
   trip: Trip;
@@ -14,6 +15,7 @@ interface PaymentProps {
 }
 
 const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSuccess, user, tripDate, onUserUpdate }) => {
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [passengerName, setPassengerName] = useState(user?.name ? `${user.name} ${user.lastName || ''}`.trim() : '');
@@ -126,14 +128,14 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
     // Validar si es tarjeta nueva
     if (!useSavedCard) {
       if (!validatePaymentForm()) {
-        alert('Por favor completa correctamente todos los campos de la tarjeta');
+        toast.show('Por favor completa correctamente todos los campos de la tarjeta','warning');
         return;
       }
     }
     
     if (!user) {
       console.error('Usuario no autenticado');
-      alert('Debes iniciar sesión para comprar boletos');
+      toast.show('Debes iniciar sesión para comprar boletos','error');
       onBack();
       return;
     }
@@ -225,7 +227,7 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
 
       if (!result.ok) {
         const backendMsg = result.data?.msg || 'No se pudo guardar el boleto';
-        alert(backendMsg);
+        toast.show(backendMsg,'error');
         setLoading(false);
         return;
       }
@@ -266,7 +268,7 @@ const Payment: React.FC<PaymentProps> = ({ trip, selectedSeats, onBack, onSucces
       }
     } catch (error) {
       console.error('Error en el pago:', error);
-      alert('Error al procesar el pago. Intenta de nuevo.');
+      toast.show('Error al procesar el pago. Intenta de nuevo.','error');
       setLoading(false);
     }
   };

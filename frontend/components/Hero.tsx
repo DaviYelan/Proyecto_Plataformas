@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { MapPin, Calendar, Search } from 'lucide-react';
 import { SearchParams } from '../types';
+import { useToast } from './ui/Toast';
 
 interface HeroProps {
   onSearch: (params: SearchParams) => void;
 }
 
 const Hero: React.FC<HeroProps> = ({ onSearch }) => {
+  const toast = useToast();
   const [searchParams, setSearchParams] = useState<SearchParams>({
     origin: 'Puyo',
     destination: 'Zamora',
@@ -26,7 +28,7 @@ const Hero: React.FC<HeroProps> = ({ onSearch }) => {
 
   const handleSearchClick = () => {
     if (!searchParams.origin || !searchParams.destination) {
-      alert("Por favor ingresa un origen y un destino");
+      toast.show('Por favor ingresa un origen y un destino','warning');
       return;
     }
     onSearch(searchParams);

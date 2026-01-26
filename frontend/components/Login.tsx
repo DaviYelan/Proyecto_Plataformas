@@ -133,11 +133,6 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess, onSwitchToRegist
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-10">
             <h2 className="text-3xl font-bold text-white mb-2">Tu viaje comienza aquí</h2>
             <p className="text-gray-300">Conecta con los mejores destinos del Ecuador al mejor precio.</p>
-             <div className="mt-4 p-3 bg-black/40 rounded-lg text-xs text-gray-400 border border-gray-700">
-                <p className="font-bold text-gray-300">Demo Login:</p>
-                <p>Admin: admin@busgo.com</p>
-                <p>Cliente: (cualquier correo)</p>
-             </div>
           </div>
         </div>
 

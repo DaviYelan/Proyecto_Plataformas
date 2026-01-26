@@ -16,6 +16,7 @@ const AdminDashboard = ReactLazy(() => import('./AdminDashboard'));
 const ClientDashboard = ReactLazy(() => import('./ClientDashboard'));
 import { SearchParams, Trip, Ticket, User } from '../types';
 import * as api from '../services/apiService';
+import { useToast } from './ui/Toast';
 
 // Mock Data for trips
 const MOCK_TRIPS: Trip[] = [
@@ -127,6 +128,7 @@ const MOCK_TRIPS: Trip[] = [
 ];
 
 const App: React.FC = () => {
+  const toast = useToast();
   // Navigation State
   const [view, setView] = useState<'landing' | 'admin' | 'client'>('landing');
   
@@ -201,7 +203,7 @@ const App: React.FC = () => {
       setView('client');
     } catch (error) {
       console.error('Error al procesar compra:', error);
-      alert('Error al procesar la compra. Por favor intente nuevamente.');
+      toast.show('Error al procesar la compra. Por favor intente nuevamente.','error');
     }
   };
 
@@ -232,22 +234,22 @@ const App: React.FC = () => {
   };
 
   const handleLoginSuccess = (user: User) => {
-    // Populate with mock profile data for demo
+    // Usar exactamente los datos del usuario autenticado sin valores "demo"
     const detailedUser: User = {
-        ...user,
-        lastName: user.lastName || 'Demo',
-        identificationType: user.identificationType || 'Cedula',
-        identificationNumber: user.identificationNumber || '1720304050',
-        birthDate: user.birthDate || '1995-05-15',
-        address: user.address || 'Av. Amazonas y Naciones Unidas',
-        gender: user.gender || 'Masculino',
-        tariffType: user.tariffType || 'General',
-        balance: user.balance ?? 0,
-        paymentMethods: [
-            { id: 1, type: 'Tarjeta de Crédito', holder: user.name + ' ' + (user.lastName || 'Demo'), number: '**** **** **** 5343', expiry: '12/30', brand: 'visa' }
-        ]
+      ...user,
+      lastName: user.lastName || '',
+      identificationType: user.identificationType,
+      identificationNumber: user.identificationNumber,
+      birthDate: user.birthDate,
+      address: user.address,
+      gender: user.gender,
+      tariffType: user.tariffType || 'General',
+      balance: user.balance ?? 0,
+      paymentMethods: user.paymentMethods && user.paymentMethods.length > 0
+        ? user.paymentMethods
+        : []
     };
-    
+
     // Cargar saldo desde localStorage si existe
     const savedBalance = localStorage.getItem(`user_balance_${user.email}`);
     if (savedBalance) {
@@ -257,11 +259,7 @@ const App: React.FC = () => {
     setCurrentUser(detailedUser);
     setShowLogin(false);
     setShowRegister(false);
-    if (user.role === 'admin') {
-      setView('admin');
-    } else {
-      setView('client');
-    }
+    setView(user.role === 'admin' ? 'admin' : 'client');
   };
 
   const handleLogout = async () => {
@@ -307,11 +305,11 @@ const App: React.FC = () => {
               const persona = personas.find((p: any) => p.id_persona === u.id || p.cuenta?.correo === u.correo);
               if (persona) {
                 const mp = persona.metodo_pago;
+                // Usar los nombres de sesión (u.nombre, u.apellido) que ya tienen los nombres de Google
+                // No sobrescribir con persona.nombre/persona.apellido que pueden ser antiguos
                 mappedUser = {
                   ...mappedUser,
                   phone: persona.telefono || mappedUser.phone,
-                  name: persona.nombre || mappedUser.name,
-                  lastName: persona.apellido || mappedUser.lastName,
                   balance: persona.saldo_disponible ?? mappedUser.balance,
                   paymentMethods: mp ? [{
                     id: mp.id_pago,

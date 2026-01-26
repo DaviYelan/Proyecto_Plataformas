@@ -3,6 +3,7 @@ import { User, Ticket, PaymentMethod } from '../types';
 import { LogOut, LayoutDashboard, Ticket as TicketIcon, User as UserIcon, Settings, Download, Trash2, Menu, X, CreditCard, Heart, Calendar, Clock, TrendingUp, MapPin, Plus, Check, Wallet } from 'lucide-react';
 import * as api from '../services/apiService';
 import { jsPDF } from 'jspdf';
+import { useToast } from './ui/Toast';
 
 interface ClientDashboardProps {
   user: User;
@@ -12,6 +13,7 @@ interface ClientDashboardProps {
 }
 
 const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogout, onGoHome }) => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'overview' | 'tickets' | 'payment-methods' | 'profile' | 'settings'>('overview');
   const [currentUserData, setCurrentUserData] = useState(user);
 
@@ -226,7 +228,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
     const amount = parseFloat(topUpAmount);
     
     if (!topUpAmount || amount <= 0) {
-      alert('Ingresa un monto válido');
+      toast.show('Ingresa un monto válido', 'warning');
       return;
     }
     
@@ -237,7 +239,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
       if (!rechargeResult.ok) {
         const errorMsg = rechargeResult.error || 'No se pudo recargar el saldo en el servidor. Intenta de nuevo.';
         console.error('Error recarga:', errorMsg);
-        alert(`Error: ${errorMsg}`);
+        toast.show(`Error: ${errorMsg}`, 'error');
         return;
       }
 
@@ -249,12 +251,12 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user, tickets, onLogo
         setCurrentUserData(prev => ({ ...prev, balance: newBalance }));
       }
 
-      alert(`¡Saldo recargado exitosamente! Nuevo saldo: $${newBalance.toFixed(2)}`);
+      toast.show(`¡Saldo recargado exitosamente! Nuevo saldo: $${newBalance.toFixed(2)}`,'success');
       setShowTopUpModal(false);
       setTopUpAmount('');
     } catch (error) {
       console.error('Error al recargar saldo:', error);
-      alert('Error al procesar la recarga. Intenta de nuevo.');
+      toast.show('Error al procesar la recarga. Intenta de nuevo.','error');
     } finally {
       setTopUpLoading(false);
     }

@@ -115,14 +115,14 @@ def chat_with_gemini():
     """Endpoint para chatear con Gemini AI"""
     try:
         data = request.get_json()
-        query = data.get("query", "")
-        
+        query = data.get("query", "") if data else ""
+
         if not query:
             return jsonify({"error": "No se proporcionó una consulta"}), 400
-        
+
         if not GEMINI_API_KEY:
             return jsonify({"error": "API key de Gemini no configurada"}), 500
-        
+
         # Llamar a la API de Gemini
         response = requests.post(
             f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
@@ -141,25 +141,25 @@ def chat_with_gemini():
             },
             timeout=30
         )
-        
+
         if response.status_code == 429:
             return jsonify({
                 "error": "Cuota de API excedida. Por favor, intenta más tarde."
             }), 429
-        
+
         if not response.ok:
             return jsonify({
                 "error": f"Error de la API de Gemini: {response.status_code}"
             }), response.status_code
-        
+
         result = response.json()
         text = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-        
+
         if not text:
             text = "Lo siento, no pude generar una respuesta."
-        
+
         return jsonify({"text": text})
-        
+
     except requests.exceptions.Timeout:
         return jsonify({"error": "Tiempo de espera agotado"}), 504
     except Exception as e:
@@ -240,8 +240,8 @@ def api_session():
                     "authenticated": True,
                     "user": {
                         "id": persona_data.get("id_persona"),
-                        "nombre": persona_data.get("nombre"),
-                        "apellido": persona_data.get("apellido"),
+                        "nombre": user_data.get("nombre"),
+                        "apellido": user_data.get("apellido"),
                         "correo": persona_data.get("correo") or (persona_data.get("cuenta", {}) or {}).get("correo"),
                         "tipo_cuenta": (persona_data.get("cuenta", {}) or {}).get("tipo_cuenta", "Cliente"),
                         "tipo_identificacion": persona_data.get("tipo_identificacion"),
@@ -795,28 +795,38 @@ def google_callback():
 
     profile = userinfo_resp.json()
     correo = profile.get("email")
-    nombre = profile.get("given_name") or profile.get("name")
+    # Usar siempre los nombres del perfil de Google para evitar valores viejos/incorrectos
+    nombre = profile.get("given_name") or profile.get("name") or ""
     apellido = profile.get("family_name") or ""
 
     # Buscar persona en backend por correo
     try:
         personas_resp = requests.get(f"{API_URL}/api/persona/lista", timeout=10)
+        try:
+            print(f"[google_callback] personas_resp.status = {personas_resp.status_code}")
+        except Exception:
+            pass
         if personas_resp.status_code == 200:
             personas = personas_resp.json().get("personas", [])
             persona = next((p for p in personas if (p.get("correo") or (p.get("cuenta", {}) or {}).get("correo")) == correo), None)
             if persona:
                 cuenta = persona.get("cuenta", {})
+                # SIEMPRE usar los nombres del perfil de Google, nunca los guardados en la BD
                 session["user"] = {
                     "id": persona.get("id_persona"),
-                    "nombre": persona.get("nombre"),
-                    "apellido": persona.get("apellido"),
+                    "nombre": nombre,
+                    "apellido": apellido,
                     "tipo_cuenta": cuenta.get("tipo_cuenta"),
                     "correo": cuenta.get("correo") or correo,
                 }
                 flash("Sesión iniciada con Google", "success")
                 return redirect(url_for("router.cliente"))
-    except Exception:
+    except Exception as e:
         # si falla la consulta al backend, continuar al flujo de registro
+        try:
+            print(f"[google_callback] personas_resp exception = {e}")
+        except Exception:
+            pass
         persona = None
 
     # Si no existe, intentar crear la persona automáticamente usando los datos de Google
@@ -828,7 +838,7 @@ def google_callback():
             "numero_identificacion": generated_id,
             "nombre": nombre or "",
             "apellido": apellido or "",
-            "fecha_nacimiento": "",
+            "fecha_nacimiento": "01/01/1990",
             "correo": correo,
             "genero": "No_definido",
             "direccion": "",
@@ -951,12 +961,21 @@ def google_callback():
             json=datos_registro,
             timeout=10,
         )
+        try:
+            print(f"[google_callback] crear_resp.status = {crear_resp.status_code}")
+            print(f"[google_callback] crear_resp.text = {crear_resp.text}")
+        except Exception:
+            pass
         if crear_resp.status_code == 200:
             # Intentar obtener el id de la persona creada
             persona_id = None
             try:
                 # Intentar buscar la persona recién creada por correo
                 personas_resp = requests.get(f"{API_URL}/api/persona/lista", timeout=10)
+                try:
+                    print(f"[google_callback] personas_resp_after_create.status = {personas_resp.status_code}")
+                except Exception:
+                    pass
                 if personas_resp.status_code == 200:
                     personas = personas_resp.json().get("personas", [])
                     persona = next((p for p in personas if (p.get("correo") or (p.get("cuenta", {}) or {}).get("correo")) == correo), None)
@@ -965,8 +984,8 @@ def google_callback():
                         cuenta = persona.get("cuenta", {})
                         session["user"] = {
                             "id": persona_id,
-                            "nombre": persona.get("nombre") or nombre or "Usuario",
-                            "apellido": persona.get("apellido") or apellido or "",
+                            "nombre": nombre,
+                            "apellido": apellido,
                             "tipo_cuenta": cuenta.get("tipo_cuenta", "Cliente"),
                             "correo": cuenta.get("correo") or correo,
                         }
@@ -1027,7 +1046,11 @@ def google_callback():
             flash("Cuenta creada automáticamente con Google", "success")
             return redirect(url_for("router.cliente"))
     except Exception:
-        pass
+        try:
+            import traceback
+            traceback.print_exc()
+        except Exception:
+            pass
     
     # Si todo falla, mostrar error
     flash("Error creando la cuenta con Google. Por favor intenta nuevamente.", "danger")

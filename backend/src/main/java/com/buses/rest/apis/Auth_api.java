@@ -1,9 +1,12 @@
 package com.buses.rest.apis;
 
 import controlador.servicios.Controlador_cuenta;
+import controlador.servicios.Controlador_persona;
 import modelo.Cuenta;
+import modelo.Persona;
 import modelo.enums.Estado_cuenta;
 import modelo.enums.Tipo_cuenta;
+import modelo.enums.Tipo_tarifa;
 import com.buses.rest.security.JwtUtil;
 import org.mindrot.jbcrypt.BCrypt;
 import java.security.MessageDigest;
@@ -21,6 +24,70 @@ import java.util.Collections;
 
 @Path("/auth")
 public class Auth_api {
+    
+    /**
+     * Determina el tipo de tarifa basado en el correo electrónico
+     * @param correo Correo electrónico del usuario
+     * @return Tipo de tarifa correspondiente
+     */
+    private Tipo_tarifa determinarTipoTarifa(String correo) {
+        if (correo == null) return Tipo_tarifa.General;
+        String correoLower = correo.toLowerCase().trim();
+        
+        // Estudiantes universitarios con correo @unl.edu.ec
+        if (correoLower.endsWith("@unl.edu.ec")) {
+            return Tipo_tarifa.Estudiante;
+        }
+        
+        // Por defecto, tarifa general
+        return Tipo_tarifa.General;
+    }
+    
+    /**
+     * Crea o actualiza la persona asociada a una cuenta con el tipo de tarifa correcto
+     */
+    private void crearOActualizarPersona(Cuenta cuenta) {
+        try {
+            Controlador_persona cp = new Controlador_persona();
+            controlador.tda.lista.LinkedList<Persona> personas = cp.Lista_personas();
+            Persona persona = null;
+            
+            // Buscar si ya existe una persona con este correo
+            for (int i = 0; i < personas.getSize(); i++) {
+                Persona p = personas.get(i);
+                if (p.getCorreo() != null && p.getCorreo().equalsIgnoreCase(cuenta.getCorreo())) {
+                    persona = p;
+                    break;
+                }
+            }
+            
+            Tipo_tarifa tipoTarifa = determinarTipoTarifa(cuenta.getCorreo());
+            
+            if (persona == null) {
+                // Crear nueva persona
+                persona = new Persona();
+                persona.setCorreo(cuenta.getCorreo());
+                persona.setTipo_tarifa(tipoTarifa);
+                persona.setCuenta(cuenta);
+                persona.setSaldo_disponible(0.0f);
+                cp.setPersona(persona);
+                cp.save();
+                System.out.println("[Auth] Nueva persona creada con tipo_tarifa=" + tipoTarifa + " para correo=" + cuenta.getCorreo());
+            } else {
+                // Actualizar tipo de tarifa si es necesario
+                if (persona.getTipo_tarifa() != tipoTarifa) {
+                    persona.setTipo_tarifa(tipoTarifa);
+                    cp.setPersona(persona);
+                    cp.update();
+                    System.out.println("[Auth] Tipo_tarifa actualizado a " + tipoTarifa + " para correo=" + cuenta.getCorreo());
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[Auth] Error al crear/actualizar persona: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
     private String hashPassword(String plain) {
         try {
             // Usar BCrypt para cifrar la contraseña con un factor de trabajo de 12
@@ -75,8 +142,17 @@ public class Auth_api {
             cuenta.setTipo_cuenta(Tipo_cuenta.valueOf(tipo));
             cc.setCuenta(cuenta);
             if (cc.save()) {
+                // Crear persona con tipo de tarifa automático
+                crearOActualizarPersona(cuenta);
+                
+                // Agregar información de tipo de tarifa en la respuesta
+                Tipo_tarifa tipoTarifa = determinarTipoTarifa(correo);
                 response.put("mensaje", "Cuenta creada");
                 response.put("cuenta", cuenta);
+                response.put("tipo_tarifa", tipoTarifa.name());
+                if (tipoTarifa == Tipo_tarifa.Estudiante) {
+                    response.put("descuento_info", "Descuento de estudiante (30%) aplicado automáticamente");
+                }
                 return Response.status(Response.Status.CREATED).entity(response).build();
             }
             response.put("mensaje", "Error al crear cuenta");
@@ -176,9 +252,18 @@ public class Auth_api {
                     } catch (Exception ex) {
                         // ignore persistence error for login success
                     }
-
+                    
+                    // Actualizar persona con tipo de tarifa correcto
+                    crearOActualizarPersona(c);
+                    
+                    // Agregar información de tipo de tarifa en la respuesta
+                    Tipo_tarifa tipoTarifa = determinarTipoTarifa(c.getCorreo());
                     response.put("token", token);
                     response.put("user", c);
+                    response.put("tipo_tarifa", tipoTarifa.name());
+                    if (tipoTarifa == Tipo_tarifa.Estudiante) {
+                        response.put("descuento_info", "Tienes descuento de estudiante (30%) en tus compras");
+                    }
                     return Response.ok(response).build();
                 }
             }

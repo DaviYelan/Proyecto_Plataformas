@@ -6,6 +6,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { User, Cooperative, Stopover, Discount, RouteDefinition, Trip, BusUnit } from '../types';
 import * as api from '../services/apiService';
+import { useToast } from './ui/Toast';
 
 interface AdminDashboardProps {
   user: User;
@@ -27,6 +28,7 @@ const MOCK_CHART_DATA = [
 // --- MAIN COMPONENT ---
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
+    const toast = useToast();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'cooperatives' | 'buses' | 'routes' | 'schedules' | 'users' | 'scales' | 'discounts' | 'settings' | 'profile'>('dashboard');
   const [currentAdmin, setCurrentAdmin] = useState<User>(user);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -108,6 +110,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
   // Handlers
   const handleDelete = async (setter: any, id: string, type: string) => {
     if (window.confirm('¿Confirmar eliminación? Esta acción no se puede deshacer.')) {
+                  if (!success) toast.show('Error al eliminar el registro','error');
         const numId = parseInt(id);
         let success = false;
         
@@ -165,11 +168,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
           }
           
           if (!success) {
-            alert('Error al eliminar el registro');
+            toast.show('Error al eliminar el registro','error');
           }
         } catch (error) {
           console.error('Error al eliminar:', error);
-          alert('Error al procesar la eliminación');
+          toast.show('Error al procesar la eliminación','error');
         }
     }
   };
@@ -348,7 +351,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 }
               } else if (!newBus) {
                 console.error('No se encontró un bus disponible para la cooperativa seleccionada');
-                alert('No hay buses disponibles para la cooperativa "' + (cooperatives.find(c => c.id === selectedCooperativeId)?.name || selectedCooperativeId) + '". Por favor, crea un bus para esta cooperativa primero.');
+                toast.show('No hay buses disponibles para la cooperativa "' + (cooperatives.find(c => c.id === selectedCooperativeId)?.name || String(selectedCooperativeId)) + '". Por favor, crea un bus para esta cooperativa primero.','warning');
                 return; // Detener el guardado
               }
             } else {
@@ -370,7 +373,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             
             if (!success) {
               console.error('Error al actualizar el horario');
-              alert('Error al actualizar el horario. Por favor verifica que no haya conflictos de horarios.');
+              toast.show('Error al actualizar el horario. Por favor verifica que no haya conflictos de horarios.','error');
             }
           } else {
             // Para crear: no enviar id_horario
@@ -499,14 +502,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
       if (success) {
         setModalOpen(false);
         setEditingItem(null);
-        alert('¡Guardado exitosamente!');
+        toast.show('¡Guardado exitosamente!','success');
       } else {
         // No cerrar el modal para que el usuario pueda corregir los datos
-        alert('Error al guardar. Verifica:\n- Que los horarios no se solapen con otros turnos del mismo bus\n- Que la cooperativa tenga buses disponibles\n- Que todos los campos estén completos');
+        toast.show('Error al guardar. Verifica:\n- Que los horarios no se solapen con otros turnos del mismo bus\n- Que la cooperativa tenga buses disponibles\n- Que todos los campos estén completos','error');
       }
     } catch (error) {
       console.error('Error en handleSaveItem:', error);
-      alert('Error al procesar la solicitud.');
+      toast.show('Error al procesar la solicitud.','error');
     }
   };
 
