@@ -9,10 +9,10 @@ services:
     environment:
       - JAVA_OPTS=-Xmx512m
       - USE_MONGO=true
+      - MONGO_URI=mongodb://host.docker.internal:27017
+      - MONGO_DB=BusesApp
     env_file:
       - ./backend/.env
-    networks:
-      - buses_network
   frontend:
     build: ./frontend
     image: buses-frontend-local:latest
@@ -29,9 +29,7 @@ services:
       - ./backend/.env
     depends_on:
       - backend
-    networks:
-      - buses_network
 
 networks:
-  buses_network:
-    driver: bridge
+  default:
+    name: buses_network

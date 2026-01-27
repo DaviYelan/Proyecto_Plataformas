@@ -1,0 +1,9 @@
+{
+  "name": "BusGo Ecuador - Premium Travel",
+  "description": "A premium bus travel application for Ecuador featuring route searching, seat selection, secure payments, digital tickets, and an AI-powered travel concierge.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
