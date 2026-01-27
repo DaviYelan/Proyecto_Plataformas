@@ -148,7 +148,7 @@ const Hero: React.FC<HeroProps> = ({ onSearch }) => {
              <div className="lg:col-span-2 flex items-end pt-2 lg:pt-0">
                 <button 
                   onClick={handleSearchClick}
-                  className="w-full h-[54px] bg-[#2ecc71] hover:bg-[#27ae60] active:scale-[0.98] text-white font-bold rounded-xl shadow-lg hover:shadow-[#2ecc71]/30 transition-all flex items-center justify-center gap-2 text-base"
+                  className="w-full h-[54px] bg-[#2ecc71] hover:bg-[#27ae60] active:scale-[0.98] text-white font-bold rounded-xl shadow-lg hover:shadow-[#2ecc71]/50 transition-all flex items-center justify-center gap-2 text-base"
                 >
                     <Search className="h-5 w-5" />
                     Buscar

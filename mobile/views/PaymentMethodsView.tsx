@@ -1,27 +1,166 @@
 
-import React, { useState } from 'react';
-import { CreditCard } from '../types';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, User } from '../types';
+import { apiService } from '../services/apiService';
 
 interface Props {
   onBack: () => void;
   savedCards: CreditCard[];
   onSaveCard: (card: Omit<CreditCard, 'id'>) => void;
   onDeleteCard: (id: string) => void;
+  user: User | null;
 }
 
-const PaymentMethodsView: React.FC<Props> = ({ onBack, savedCards, onSaveCard, onDeleteCard }) => {
+const PaymentMethodsView: React.FC<Props> = ({ onBack, savedCards, onSaveCard, onDeleteCard, user }) => {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newCard, setNewCard] = useState({ number: '', holder: '', expiry: '', brand: 'visa' as const });
+  const [newCard, setNewCard] = useState({ number: '', holder: '', expiry: '', cvv: '', brand: 'visa' as const });
+  const [backendCards, setBackendCards] = useState<CreditCard[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleAddCard = (e: React.FormEvent) => {
+  // Cargar tarjetas del backend al montar
+  useEffect(() => {
+    const loadCardsFromBackend = async () => {
+      if (!user?.email) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        console.log('[CARDS] Cargando tarjetas para usuario:', user.email);
+        const response = await apiService.get('/persona/lista');
+        const personas = response.data || response.personas || [];
+        
+        const userFound = personas.find((p: any) => 
+          p.correo === user.email || p.cuenta?.correo === user.email
+        );
+
+        if (userFound && userFound.metodo_pago) {
+          const metodoPago = userFound.metodo_pago;
+          
+          // Solo mostrar si tiene una tarjeta guardada
+          if (metodoPago.numero_tarjeta && metodoPago.numero_tarjeta !== '') {
+            const card: CreditCard = {
+              id: `backend-${metodoPago.id_pago || '1'}`,
+              number: metodoPago.numero_tarjeta.slice(-4),
+              holder: metodoPago.titular || 'Titular',
+              expiry: metodoPago.fecha_vencimiento || 'MM/YY',
+              brand: 'visa'
+            };
+            setBackendCards([card]);
+            console.log('[CARDS] Tarjeta cargada desde backend:', card);
+          }
+        } else {
+          console.log('[CARDS] No se encontraron tarjetas para el usuario');
+        }
+      } catch (error) {
+        console.error('[CARDS] Error al cargar tarjetas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCardsFromBackend();
+  }, [user]);
+
+  const handleAddCard = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveCard({
-      ...newCard,
-      number: newCard.number.slice(-4) // Solo guardamos los últimos 4 dígitos por seguridad simulada
-    });
-    setShowAddForm(false);
-    setNewCard({ number: '', holder: '', expiry: '', brand: 'visa' });
+    
+    if (!user?.email) {
+      alert('Debes iniciar sesión para guardar una tarjeta');
+      return;
+    }
+
+    try {
+      console.log('[CARDS] Guardando tarjeta en backend...');
+      
+      // Buscar el usuario en el backend
+      const response = await apiService.get('/persona/lista');
+      const personas = response.data || response.personas || [];
+      
+      const userFound = personas.find((p: any) => 
+        p.correo === user.email || p.cuenta?.correo === user.email
+      );
+
+      if (userFound) {
+        // Actualizar el método de pago del usuario
+        const updatedPersona = {
+          ...userFound,
+          metodo_pago: {
+            ...userFound.metodo_pago,
+            numero_tarjeta: newCard.number,
+            titular: newCard.holder,
+            fecha_vencimiento: newCard.expiry,
+            codigo_seguridad: newCard.cvv,
+            opcion_pago: 'Tarjeta_credito'
+          }
+        };
+
+        await apiService.put(`/persona/modificar/${userFound.id_persona}`, updatedPersona);
+        
+        // Actualizar la lista local
+        const savedCard: CreditCard = {
+          id: `backend-${userFound.metodo_pago?.id_pago || Date.now()}`,
+          number: newCard.number.slice(-4),
+          holder: newCard.holder,
+          expiry: newCard.expiry,
+          brand: newCard.brand
+        };
+        
+        setBackendCards([savedCard]);
+        console.log('[CARDS] Tarjeta guardada exitosamente en backend');
+      }
+      
+      setShowAddForm(false);
+      setNewCard({ number: '', holder: '', expiry: '', cvv: '', brand: 'visa' });
+    } catch (error) {
+      console.error('[CARDS] Error al guardar tarjeta:', error);
+      alert('Error al guardar la tarjeta. Intenta de nuevo.');
+    }
   };
+
+  const handleDeleteCardLocal = async (cardId: string) => {
+    if (!user?.email) return;
+
+    try {
+      console.log('[CARDS] Eliminando tarjeta:', cardId);
+      
+      // Si es una tarjeta del backend, actualizarla
+      if (cardId.startsWith('backend-')) {
+        const response = await apiService.get('/persona/lista');
+        const personas = response.data || response.personas || [];
+        
+        const userFound = personas.find((p: any) => 
+          p.correo === user.email || p.cuenta?.correo === user.email
+        );
+
+        if (userFound) {
+          const updatedPersona = {
+            ...userFound,
+            metodo_pago: {
+              ...userFound.metodo_pago,
+              numero_tarjeta: '',
+              titular: '',
+              fecha_vencimiento: '',
+              codigo_seguridad: ''
+            }
+          };
+
+          await apiService.put(`/persona/modificar/${userFound.id_persona}`, updatedPersona);
+          setBackendCards([]);
+          console.log('[CARDS] Tarjeta eliminada del backend');
+        }
+      }
+      
+      onDeleteCard(cardId);
+    } catch (error) {
+      console.error('[CARDS] Error al eliminar tarjeta:', error);
+      alert('Error al eliminar la tarjeta');
+    }
+  };
+
+  // Combinar tarjetas locales y del backend
+  const allCards = [...backendCards, ...savedCards.filter(c => !c.id.startsWith('backend-'))];
+
 
   return (
     <div className="flex flex-col h-full bg-background-dark font-sans relative">
@@ -41,41 +180,49 @@ const PaymentMethodsView: React.FC<Props> = ({ onBack, savedCards, onSaveCard, o
         <div className="space-y-4">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-500 ml-1">Tus Tarjetas Guardadas</h3>
           
-          {savedCards.map(card => (
-            <div key={card.id} className="relative h-48 w-full bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-3xl p-6 border border-white/10 shadow-2xl overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                 <span className="material-symbols-outlined text-8xl text-white">contactless</span>
-              </div>
-              <button 
-                onClick={() => onDeleteCard(card.id)}
-                className="absolute top-4 right-4 z-20 text-white/30 hover:text-red-400 transition-colors"
-              >
-                <span className="material-symbols-outlined">delete</span>
-              </button>
-              <div className="flex flex-col h-full justify-between relative z-10">
-                 <div className="flex justify-between items-start">
-                    <div className="size-10 bg-white/10 rounded-lg flex items-center justify-center">
-                      <span className="material-symbols-outlined text-white">credit_card</span>
-                    </div>
-                    <span className="text-white font-bold italic tracking-tighter uppercase">{card.brand}</span>
-                 </div>
-                 <div className="space-y-1">
-                    <p className="text-white/40 text-[10px] font-bold tracking-widest uppercase">Número de Tarjeta</p>
-                    <p className="text-white text-lg font-mono tracking-[0.2em]">•••• •••• •••• {card.number}</p>
-                 </div>
-                 <div className="flex justify-between">
-                    <div>
-                      <p className="text-white/40 text-[8px] font-bold uppercase">Titular</p>
-                      <p className="text-white text-xs font-bold uppercase">{card.holder}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-white/40 text-[8px] font-bold uppercase">Vence</p>
-                      <p className="text-white text-xs font-bold">{card.expiry}</p>
-                    </div>
-                 </div>
-              </div>
+          {loading ? (
+            <div className="text-center py-8 text-neutral-500">
+              <span className="text-sm">Cargando tarjetas...</span>
             </div>
-          ))}
+          ) : (
+            <>
+              {allCards.map(card => (
+                <div key={card.id} className="relative h-48 w-full bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-3xl p-6 border border-white/10 shadow-2xl overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+                     <span className="material-symbols-outlined text-8xl text-white">contactless</span>
+                  </div>
+                  <button 
+                    onClick={() => handleDeleteCardLocal(card.id)}
+                    className="absolute top-4 right-4 z-20 text-white/30 hover:text-red-400 transition-colors"
+                  >
+                    <span className="material-symbols-outlined">delete</span>
+                  </button>
+                  <div className="flex flex-col h-full justify-between relative z-10">
+                     <div className="flex justify-between items-start">
+                        <div className="size-10 bg-white/10 rounded-lg flex items-center justify-center">
+                          <span className="material-symbols-outlined text-white">credit_card</span>
+                        </div>
+                        <span className="text-white font-bold italic tracking-tighter uppercase">{card.brand}</span>
+                     </div>
+                     <div className="space-y-1">
+                        <p className="text-white/40 text-[10px] font-bold tracking-widest uppercase">Número de Tarjeta</p>
+                        <p className="text-white text-lg font-mono tracking-[0.2em]">•••• •••• •••• {card.number}</p>
+                     </div>
+                     <div className="flex justify-between">
+                        <div>
+                          <p className="text-white/40 text-[8px] font-bold uppercase">Titular</p>
+                          <p className="text-white text-xs font-bold uppercase">{card.holder}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-white/40 text-[8px] font-bold uppercase">Vence</p>
+                          <p className="text-white text-xs font-bold">{card.expiry}</p>
+                        </div>
+                     </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
 
           {!showAddForm ? (
             <button 
@@ -116,19 +263,28 @@ const PaymentMethodsView: React.FC<Props> = ({ onBack, savedCards, onSaveCard, o
                      value={newCard.expiry}
                      onChange={e => setNewCard({...newCard, expiry: e.target.value})}
                    />
-                   <select 
+                   <input 
+                     required
+                     placeholder="CVV" 
+                     type="password"
+                     maxLength={4}
                      className="bg-background-dark border border-white/5 h-12 rounded-xl px-4 text-sm text-white focus:outline-none focus:border-accent-green"
-                     value={newCard.brand}
-                     onChange={e => setNewCard({...newCard, brand: e.target.value as any})}
-                   >
-                     <option value="visa">Visa</option>
-                     <option value="mastercard">Mastercard</option>
-                     <option value="amex">Amex</option>
-                   </select>
+                     value={newCard.cvv}
+                     onChange={e => setNewCard({...newCard, cvv: e.target.value.replace(/\D/g, '')})}
+                   />
                  </div>
+                 <select 
+                   className="w-full bg-background-dark border border-white/5 h-12 rounded-xl px-4 text-sm text-white focus:outline-none focus:border-accent-green"
+                   value={newCard.brand}
+                   onChange={e => setNewCard({...newCard, brand: e.target.value as any})}
+                 >
+                   <option value="visa">Visa</option>
+                   <option value="mastercard">Mastercard</option>
+                   <option value="amex">Amex</option>
+                 </select>
                </div>
                <button type="submit" className="w-full bg-accent-green text-primary h-12 rounded-xl font-bold mt-2 active:scale-95 transition-transform">
-                 Guardar Tarjeta
+                 Guardar Tarjeta en Backend
                </button>
             </form>
           )}

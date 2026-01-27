@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useTheme } from '../ThemeContext';
 import { View, Message } from '../types';
 import { getAIResponse } from '../geminiService';
 
@@ -8,6 +9,7 @@ interface Props {
 }
 
 const AIChatView: React.FC<Props> = ({ onNavigate }) => {
+  const { isDarkMode } = useTheme();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -54,24 +56,24 @@ const AIChatView: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background-dark">
-      <header className="sticky top-0 z-50 bg-background-dark/80 backdrop-blur-md pt-12 border-b border-white/5">
+    <div className={`flex flex-col h-full ${isDarkMode ? 'bg-background-dark' : 'bg-white'}`}>
+      <header className={`sticky top-0 z-50 backdrop-blur-md pt-12 border-b ${isDarkMode ? 'bg-background-dark/80 border-white/5' : 'bg-white/80 border-gray-200'}`}>
         <div className="flex items-center px-4 pb-4 gap-4">
           <button 
             onClick={() => onNavigate(View.HOME)}
-            className="size-10 flex items-center justify-center rounded-full bg-white/5 active:bg-white/10 transition-colors"
+            className={`size-10 flex items-center justify-center rounded-full transition-colors ${isDarkMode ? 'bg-white/5 active:bg-white/10 text-white' : 'bg-gray-200 active:bg-gray-300 text-black'}`}
           >
-            <span className="material-symbols-outlined text-white">arrow_back</span>
+            <span className="material-symbols-outlined">arrow_back</span>
           </button>
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-accent-green flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <span className="material-symbols-outlined text-primary font-bold">smart_toy</span>
+            <div className="size-10 rounded-xl bg-[#2ecc71] flex items-center justify-center shadow-lg shadow-[#2ecc71]/20">
+              <span className="material-symbols-outlined text-black font-bold">smart_toy</span>
             </div>
             <div>
-              <h2 className="text-white text-base font-bold">BusGo AI</h2>
+              <h2 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>BusGo AI</h2>
               <div className="flex items-center gap-1.5">
-                <div className="size-1.5 rounded-full bg-accent-green animate-pulse"></div>
-                <span className="text-[10px] text-accent-green font-bold uppercase tracking-widest">Online</span>
+                <div className="size-1.5 rounded-full bg-[#2ecc71] animate-pulse"></div>
+                <span className="text-[10px] text-[#2ecc71] font-bold uppercase tracking-widest">Online</span>
               </div>
             </div>
           </div>

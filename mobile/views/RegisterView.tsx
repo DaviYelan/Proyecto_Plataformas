@@ -88,7 +88,7 @@ const RegisterView: React.FC<Props> = ({ onNavigate, onBack, showToast }) => {
                 <button 
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-accent-green text-[10px] font-bold uppercase tracking-widest"
+                  className="text-[#2ecc71] text-[10px] font-bold uppercase tracking-widest"
                 >
                   {showPassword ? 'Ocultar' : 'Ver'}
                 </button>
@@ -116,9 +116,9 @@ const RegisterView: React.FC<Props> = ({ onNavigate, onBack, showToast }) => {
 
         <div className="px-6 py-4">
           <label className="flex items-center gap-3 cursor-pointer group">
-            <input required className="rounded text-accent-green focus:ring-accent-green bg-transparent border-white/10 size-5" type="checkbox" />
+            <input required className="rounded text-[#2ecc71] focus:ring-[#2ecc71] bg-transparent border-white/10 size-5" type="checkbox" />
             <span className="text-sm text-neutral-500 group-hover:text-neutral-400 transition-colors">
-              Acepto los <span className="text-accent-green font-bold">Términos y Condiciones</span> y la <span className="text-accent-green font-bold">Política de Privacidad</span>.
+              Acepto los <span className="text-[#2ecc71] font-bold">Términos y Condiciones</span> y la <span className="text-[#2ecc71] font-bold">Política de Privacidad</span>.
             </span>
           </label>
         </div>
@@ -126,7 +126,7 @@ const RegisterView: React.FC<Props> = ({ onNavigate, onBack, showToast }) => {
         <div className="px-6 pt-4 pb-12">
           <button 
             type="submit"
-            className="w-full bg-accent-green hover:bg-emerald-500 text-primary font-black h-16 rounded-xl shadow-xl shadow-accent-green/10 transition-all active:scale-[0.98]"
+            className="w-full bg-[#2ecc71] hover:bg-[#27ae60] text-black font-black h-16 rounded-xl shadow-xl shadow-[#2ecc71]/50 transition-all active:scale-[0.98]"
           >
             Registrarme
           </button>

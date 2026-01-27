@@ -29,30 +29,30 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="text-white font-semibold mb-4">Compañía</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Sobre Nosotros</a></li>
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Nuestra Flota</a></li>
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Trabaja Aquí</a></li>
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Blog de Viajes</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Sobre Nosotros</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Nuestra Flota</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Trabaja Aquí</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Blog de Viajes</a></li>
             </ul>
           </div>
 
           <div>
             <h4 className="text-white font-semibold mb-4">Soporte</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Centro de Ayuda</a></li>
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Contacto</a></li>
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Preguntas Frecuentes</a></li>
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Estado del Boleto</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Centro de Ayuda</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Contacto</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Preguntas Frecuentes</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Estado del Boleto</a></li>
             </ul>
           </div>
 
           <div>
             <h4 className="text-white font-semibold mb-4">Legal</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Términos y Condiciones</a></li>
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Política de Privacidad</a></li>
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Política de Cookies</a></li>
-              <li><a href="#" className="hover:text-[#2ecc71] transition-colors">Libro de Reclamaciones</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Términos y Condiciones</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Política de Privacidad</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Política de Cookies</a></li>
+              <li><a href="#" className="text-[#2ecc71] hover:text-[#27ae60] transition-colors">Libro de Reclamaciones</a></li>
             </ul>
           </div>
         </div>

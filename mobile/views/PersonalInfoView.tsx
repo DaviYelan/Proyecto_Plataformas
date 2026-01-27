@@ -42,7 +42,7 @@ const PersonalInfoView: React.FC<Props> = ({ onBack, user }) => {
           </div>
         </div>
 
-        <button className="w-full h-14 bg-white/5 border border-white/10 text-accent-green font-bold rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform">
+        <button className="w-full h-14 bg-[#2ecc71] text-black font-bold rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-[#27ae60] shadow-lg shadow-[#2ecc71]/30">
           <span className="material-symbols-outlined">edit</span>
           Editar Información
         </button>

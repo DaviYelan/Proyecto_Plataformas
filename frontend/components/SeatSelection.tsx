@@ -124,7 +124,7 @@ const SeatSelection: React.FC<SeatSelectionProps> = ({ trip, onBack, onNext }) =
                   onClick={() => toggleSeat(seat.id)}
                   className={`
                     relative w-10 h-10 rounded-t-lg rounded-b-md flex items-center justify-center text-xs font-bold transition-all duration-200 shadow-sm
-                    ${seat.status === 'available' ? 'bg-[#2a2e2a] border-2 border-gray-600 text-gray-400 hover:border-[#2ecc71] hover:text-[#2ecc71] hover:bg-[#2ecc71]/10' : ''}
+                    ${seat.status === 'available' ? 'bg-[#2ecc71] border-2 border-[#2ecc71] text-white hover:bg-[#27ae60] hover:border-[#27ae60]' : ''}
                     ${seat.status === 'selected' ? 'bg-[#2ecc71] border-2 border-[#2ecc71] text-white transform scale-105 shadow-md shadow-green-500/20' : ''}
                     ${seat.status === 'occupied' ? 'bg-gray-800 border-2 border-gray-800 text-gray-600 cursor-not-allowed' : ''}
                     ${(parseInt(seat.number) % 2 === 0 && parseInt(seat.number) % 4 !== 0) ? 'mr-1' : ''}

@@ -392,7 +392,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ results, searchParams, on
                          
                          <button 
                            onClick={() => handleTripSelect(trip)}
-                           className="px-6 py-2.5 rounded-lg border-2 border-[#2ecc71] text-[#2ecc71] font-bold hover:bg-[#2ecc71] hover:text-white transition-all text-sm w-full"
+                           className="px-6 py-2.5 rounded-lg border-2 border-[#2ecc71] bg-[#2ecc71] text-white font-bold hover:bg-[#27ae60] hover:border-[#27ae60] transition-all text-sm w-full"
                          >
                            Seleccionar
                          </button>

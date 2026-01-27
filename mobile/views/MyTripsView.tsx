@@ -1,52 +1,193 @@
 
-import React, { useState } from 'react';
-import { View, BusTrip } from '../types';
+import React, { useState, useEffect } from 'react';
+import { useTheme } from '../ThemeContext';
+import { View, BusTrip, User } from '../types';
+import { apiService } from '../services/apiService';
 
 interface Props {
   onNavigate: (view: View) => void;
   onSelectTrip: (trip: BusTrip) => void;
   onTrackTrip: (trip: BusTrip) => void;
   myTrips: BusTrip[];
+  user: User | null;
 }
 
-const MyTripsView: React.FC<Props> = ({ onNavigate, onSelectTrip, onTrackTrip, myTrips }) => {
+const MyTripsView: React.FC<Props> = ({ onNavigate, onSelectTrip, onTrackTrip, myTrips, user }) => {
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
+  const { isDarkMode } = useTheme();
+  const [backendTrips, setBackendTrips] = useState<BusTrip[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const filteredTrips = myTrips.filter(t => 
+  useEffect(() => {
+    if (user) {
+      loadTripsFromBackend();
+    }
+  }, [user]);
+
+  const loadTripsFromBackend = async () => {
+    if (!user?.email) {
+      console.log('[TRIPS] No hay usuario autenticado');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('[TRIPS] Cargando viajes para usuario:', user.email);
+      console.log('[TRIPS] Objeto usuario completo:', user);
+      
+      // Primero obtener los datos del usuario para vincular sus boletos
+      const personaResponse = await apiService.get('/persona/lista');
+      console.log('[TRIPS] Respuesta de /persona/lista:', personaResponse);
+      
+      const personas = personaResponse.data || personaResponse.personas || personaResponse || [];
+      console.log('[TRIPS] Total de personas encontradas:', personas.length);
+      
+      const userFound = personas.find((p: any) => 
+        p.correo === user.email || p.cuenta?.correo === user.email
+      );
+
+      if (!userFound) {
+        console.error('[TRIPS] Usuario NO encontrado en backend con email:', user.email);
+        console.log('[TRIPS] Emails disponibles:', personas.map((p: any) => p.correo || p.cuenta?.correo));
+        setLoading(false);
+        return;
+      }
+
+      console.log('[TRIPS] ✓ Usuario encontrado, id_persona:', userFound.id_persona);
+      console.log('[TRIPS] Datos del usuario:', userFound);
+
+      // Cargar todos los boletos
+      const boletosResponse = await apiService.get('/boleto/lista');
+      console.log('[TRIPS] Respuesta de /boleto/lista:', boletosResponse);
+      
+      const boletos = boletosResponse.data || boletosResponse.boletos || boletosResponse || [];
+      console.log('[TRIPS] Total de boletos en backend:', boletos.length);
+      
+      if (boletos.length > 0) {
+        console.log('[TRIPS] Estructura del primer boleto:', boletos[0]);
+      }
+      
+      // Filtrar solo los boletos de este usuario
+      const userBoletos = boletos.filter((boleto: any) => {
+        const boletoPersonaId = boleto.persona?.id_persona;
+        const match = boletoPersonaId === userFound.id_persona;
+        if (match) {
+          console.log('[TRIPS] ✓ Boleto #' + boleto.id_boleto + ' coincide con usuario');
+        }
+        return match;
+      });
+
+      console.log('[TRIPS] ✓✓✓ Boletos del usuario:', userBoletos.length);
+      
+      if (userBoletos.length === 0) {
+        console.warn('[TRIPS] ⚠ No se encontraron boletos para id_persona:', userFound.id_persona);
+        setBackendTrips([]);
+        setLoading(false);
+        return;
+      }
+
+      // Convertir boletos a BusTrip y determinar si son pasados o próximos
+      const trips: BusTrip[] = userBoletos.map((boleto: any) => {
+        // Parsear la fecha del boleto (fecha_compra está en formato DD/MM/YYYY)
+        const [day, month, year] = (boleto.fecha_compra || '01/01/2025').split('/');
+        const tripDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Determinar si el viaje es pasado o próximo
+        const isPast = tripDate < today;
+        const status = isPast ? 'Completado' : 'Confirmado';
+
+        // Obtener información de la ruta desde el turno
+        const turno = boleto.turno;
+        const horario = turno?.horario;
+        const ruta = horario?.ruta;
+        const bus = ruta?.bus;
+        const cooperativa = bus?.cooperativa;
+
+        return {
+          id: boleto.id_boleto?.toString() || '',
+          company: cooperativa?.nombre_cooperativa || 'BusGo Premium',
+          logoUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=100',
+          rating: 4.5,
+          reviewsCount: 100,
+          departureTime: horario?.hora_salida || '08:00 AM',
+          arrivalTime: horario?.hora_llegada || '04:00 PM',
+          duration: ruta?.tiempo_estimado || '8h',
+          origin: ruta?.origen || 'Origen',
+          destination: ruta?.destino || 'Destino',
+          price: parseFloat(boleto.precio_final || '0'),
+          class: 'Executive',
+          amenities: [],
+          bookedSeats: [boleto.numero_asiento?.toString() || '1'],
+          bookingDate: new Date(tripDate).toLocaleDateString('es-ES', { 
+            day: '2-digit', 
+            month: 'short', 
+            year: 'numeric' 
+          }),
+          status: status,
+          isOfflineAvailable: true
+        };
+      });
+      
+      setBackendTrips(trips);
+      console.log('[TRIPS] Viajes cargados:', trips.length, '- Pasados:', trips.filter(t => t.status === 'Completado').length, '- Próximos:', trips.filter(t => t.status !== 'Completado').length);
+    } catch (error) {
+      console.error('[TRIPS] Error al cargar boletos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Combinar viajes del localStorage con los del backend (evitar duplicados)
+  const allTrips = [...backendTrips, ...myTrips.filter(mt => 
+    !backendTrips.some(bt => bt.id === mt.id)
+  )];
+  
+  const filteredTrips = allTrips.filter(t => 
     tab === 'upcoming' ? t.status !== 'Completado' : t.status === 'Completado'
   );
 
   return (
-    <div className="flex flex-col h-full bg-background-dark font-sans">
-      <header className="sticky top-0 z-50 bg-background-dark/80 backdrop-blur-md pt-12 border-b border-white/5">
+    <div className={`flex flex-col h-full ${isDarkMode ? 'bg-background-dark' : 'bg-white'} font-sans`}>
+      <header className={`sticky top-0 z-50 backdrop-blur-md pt-12 border-b ${isDarkMode ? 'bg-background-dark/80 border-white/5' : 'bg-white/80 border-gray-200'}`}>
         <div className="px-6 pb-4">
-          <h2 className="text-white text-2xl font-bold tracking-tight">Mis Viajes</h2>
-          <p className="text-neutral-500 text-xs font-medium uppercase tracking-widest mt-1">Gestiona tus boletos</p>
+          <h2 className={`text-2xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-black'}`}>Mis Viajes</h2>
+          <p className={`text-xs font-medium uppercase tracking-widest mt-1 ${isDarkMode ? 'text-neutral-500' : 'text-gray-500'}`}>Gestiona tus boletos</p>
         </div>
         
-        <div className="flex px-6 gap-8 border-t border-white/5">
+        <div className={`flex px-6 gap-8 border-t ${isDarkMode ? 'border-white/5' : 'border-gray-200'}`}>
           <button 
             onClick={() => setTab('upcoming')}
-            className={`py-4 text-xs font-black uppercase tracking-widest transition-all relative ${tab === 'upcoming' ? 'text-accent-green' : 'text-neutral-500'}`}
+            className={`py-4 text-xs font-black uppercase tracking-widest transition-all relative ${tab === 'upcoming' ? 'text-[#2ecc71]' : 'text-neutral-500'}`}
           >
             Próximos
-            {tab === 'upcoming' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-accent-green rounded-t-full"></div>}
+            {tab === 'upcoming' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#2ecc71] rounded-t-full"></div>}
           </button>
           <button 
             onClick={() => setTab('past')}
-            className={`py-4 text-xs font-black uppercase tracking-widest transition-all relative ${tab === 'past' ? 'text-accent-green' : 'text-neutral-500'}`}
+            className={`py-4 text-xs font-black uppercase tracking-widest transition-all relative ${tab === 'past' ? 'text-[#2ecc71]' : 'text-neutral-500'}`}
           >
             Pasados
-            {tab === 'past' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-accent-green rounded-t-full"></div>}
+            {tab === 'past' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#2ecc71] rounded-t-full"></div>}
           </button>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 pb-32 hide-scrollbar">
-        {filteredTrips.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2ecc71] mb-4"></div>
+            <p className="text-neutral-500 font-bold">Cargando viajes...</p>
+          </div>
+        ) : filteredTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 opacity-30 text-center">
             <span className="material-symbols-outlined text-6xl mb-4">no_travel</span>
             <p className="font-bold text-lg">No hay viajes registrados</p>
+            <p className="text-sm text-neutral-600 mt-2">
+              {!user ? 'Inicia sesión para ver tus viajes' : `En ${tab === 'upcoming' ? 'próximos' : 'pasados'}`}
+            </p>
           </div>
         ) : (
           filteredTrips.map(trip => (
@@ -113,22 +254,22 @@ const MyTripsView: React.FC<Props> = ({ onNavigate, onSelectTrip, onTrackTrip, m
         )}
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-background-dark/95 backdrop-blur-2xl border-t border-white/5 h-[84px] flex justify-around items-center px-4 pb-6 z-50">
-        <button onClick={() => onNavigate(View.HOME)} className="flex flex-col items-center gap-1.5 opacity-30">
+      <div className={`fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] backdrop-blur-2xl border-t h-[84px] flex justify-around items-center px-4 pb-6 z-50 ${isDarkMode ? 'bg-background-dark/95 border-white/5' : 'bg-white/95 border-gray-200'}`}>
+        <button onClick={() => onNavigate(View.HOME)} className={`flex flex-col items-center gap-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           <span className="material-symbols-outlined text-[24px]">home</span>
-          <span className="text-[8px] font-bold uppercase tracking-widest">Inicio</span>
+          <span className="text-[8px] font-bold uppercase tracking-widest">INICIO</span>
         </button>
-        <button onClick={() => onNavigate(View.AI_CHAT)} className="flex flex-col items-center gap-1.5 opacity-30">
+        <button onClick={() => onNavigate(View.AI_CHAT)} className={`flex flex-col items-center gap-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           <span className="material-symbols-outlined text-[24px]">smart_toy</span>
-          <span className="text-[8px] font-bold uppercase tracking-widest">BusGo AI</span>
+          <span className="text-[8px] font-bold uppercase tracking-widest">BUSGO AI</span>
         </button>
-        <button className="flex flex-col items-center gap-1.5 text-accent-green">
+        <button className="flex flex-col items-center gap-1.5 text-[#2ecc71]">
           <span className="material-symbols-outlined text-[24px] fill-1">confirmation_number</span>
-          <span className="text-[8px] font-bold uppercase tracking-widest">Viajes</span>
+          <span className="text-[8px] font-bold uppercase tracking-widest">VIAJES</span>
         </button>
-        <button onClick={() => onNavigate(View.PROFILE)} className="flex flex-col items-center gap-1.5 opacity-30">
+        <button onClick={() => onNavigate(View.PROFILE)} className={`flex flex-col items-center gap-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           <span className="material-symbols-outlined text-[24px]">person</span>
-          <span className="text-[8px] font-bold uppercase tracking-widest">Perfil</span>
+          <span className="text-[8px] font-bold uppercase tracking-widest">PERFIL</span>
         </button>
       </div>
     </div>

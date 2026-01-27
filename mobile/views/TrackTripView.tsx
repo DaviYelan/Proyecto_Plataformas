@@ -45,7 +45,7 @@ const TrackTripView: React.FC<Props> = ({ trip, onBack, showToast }) => {
           </button>
           <div>
             <h2 className="text-white text-lg font-bold">Rastreo en Vivo</h2>
-            <p className="text-[10px] text-accent-green font-bold uppercase tracking-widest">Bus {trip?.id?.slice(-4).toUpperCase() || 'E-452'}</p>
+            <p className="text-[10px] text-[#2ecc71] font-bold uppercase tracking-widest">Bus {trip?.id?.slice(-4).toUpperCase() || 'E-452'}</p>
           </div>
         </div>
       </header>
@@ -96,7 +96,7 @@ const TrackTripView: React.FC<Props> = ({ trip, onBack, showToast }) => {
           </button>
           <button 
             onClick={toggleAlert}
-            className={`size-12 backdrop-blur-xl border rounded-2xl flex items-center justify-center transition-all active:scale-90 shadow-2xl ${isAlertEnabled ? 'bg-accent-green text-primary border-accent-green' : 'bg-white/10 text-white border-white/10'}`}
+            className={`size-12 backdrop-blur-xl border rounded-2xl flex items-center justify-center transition-all active:scale-90 shadow-2xl ${isAlertEnabled ? 'bg-[#2ecc71] text-black border-[#2ecc71]' : 'bg-white/10 text-white border-white/10'}`}
           >
             <span className="material-symbols-outlined">{isAlertEnabled ? 'notifications_active' : 'notifications'}</span>
           </button>
@@ -114,8 +114,8 @@ const TrackTripView: React.FC<Props> = ({ trip, onBack, showToast }) => {
           <div className="bg-[#1c1c1c] border border-white/5 rounded-[2rem] p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
-                <div className="size-12 rounded-xl bg-accent-green/10 border border-accent-green/20 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-accent-green">near_me</span>
+                <div className="size-12 rounded-xl bg-[#2ecc71]/10 border border-[#2ecc71]/20 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[#2ecc71]">near_me</span>
                 </div>
                 <div>
                   <p className="text-white font-bold text-base">Próxima Parada</p>
@@ -123,13 +123,13 @@ const TrackTripView: React.FC<Props> = ({ trip, onBack, showToast }) => {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-accent-green font-black text-xl">45%</p>
+                <p className="text-[#2ecc71] font-black text-xl">45%</p>
                 <p className="text-neutral-500 text-[10px] font-bold uppercase tracking-widest">En Ruta</p>
               </div>
             </div>
 
             <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-6">
-              <div className="h-full bg-accent-green rounded-full shadow-[0_0_12px_rgba(46,204,113,0.5)] transition-all duration-1000" style={{ width: '45%' }}></div>
+              <div className="h-full bg-[#2ecc71] rounded-full shadow-[0_0_12px_rgba(46,204,113,0.5)] transition-all duration-1000" style={{ width: '45%' }}></div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

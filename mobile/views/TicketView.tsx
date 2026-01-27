@@ -47,7 +47,7 @@ const TicketView: React.FC<Props> = ({ onNavigate, trip, seats = [], date, showT
           </button>
           <button 
             onClick={() => onNavigate(View.HOME)}
-            className="text-accent-green font-bold text-sm px-4 py-2 bg-accent-green/10 rounded-full active:scale-95 transition-transform"
+            className="text-black font-bold text-sm px-4 py-2 bg-[#2ecc71] rounded-full active:scale-95 transition-transform hover:bg-[#27ae60]"
           >
             Listo
           </button>
@@ -56,7 +56,7 @@ const TicketView: React.FC<Props> = ({ onNavigate, trip, seats = [], date, showT
 
       <div className="flex-1 px-6 pb-32 overflow-y-auto hide-scrollbar flex flex-col items-center">
         <div className="w-full max-w-sm bg-white rounded-[2.5rem] overflow-hidden flex flex-col shadow-[0_30px_60px_rgba(0,0,0,0.6)] animate-in zoom-in-95 duration-500">
-          <div className="p-7 bg-accent-green text-primary relative overflow-hidden">
+          <div className="p-7 bg-[#2ecc71] text-black relative overflow-hidden">
             <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none">
               <span className="material-symbols-outlined text-9xl -rotate-12">directions_bus</span>
             </div>
@@ -124,9 +124,9 @@ const TicketView: React.FC<Props> = ({ onNavigate, trip, seats = [], date, showT
                   className="size-40 object-contain"
                   onLoad={() => console.log("QR cargado correctamente")}
                 />
-                <div className={`absolute -bottom-2 px-4 py-1 rounded-full border shadow-sm flex items-center gap-1.5 transition-colors ${trip?.isOfflineAvailable ? 'bg-accent-green border-accent-green' : 'bg-white border-neutral-100'}`}>
-                   <div className={`size-1.5 rounded-full ${trip?.isOfflineAvailable ? 'bg-white' : 'bg-accent-green'}`}></div>
-                   <span className={`text-[9px] font-black uppercase tracking-widest ${trip?.isOfflineAvailable ? 'text-white' : 'text-neutral-500'}`}>
+                <div className={`absolute -bottom-2 px-4 py-1 rounded-full border shadow-sm flex items-center gap-1.5 transition-colors ${trip?.isOfflineAvailable ? 'bg-[#2ecc71] border-[#2ecc71]' : 'bg-white border-neutral-100'}`}>
+                   <div className={`size-1.5 rounded-full ${trip?.isOfflineAvailable ? 'bg-black' : 'bg-[#2ecc71]'}`}></div>
+                   <span className={`text-[9px] font-black uppercase tracking-widest ${trip?.isOfflineAvailable ? 'text-black' : 'text-neutral-500'}`}>
                       {trip?.isOfflineAvailable ? 'Disponible Offline' : 'Listo para Sincronizar'}
                    </span>
                 </div>
