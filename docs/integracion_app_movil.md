@@ -87,3 +87,10 @@ try {
 
 La integración móvil–backend se realizó exitosamente, permitiendo que la aplicación consuma datos en tiempo real desde la API REST del proyecto. El manejo adecuado de errores garantiza una experiencia de usuario estable y confiable, incluso ante condiciones de red adversas o fallos del servidor. La documentación incluida facilita el mantenimiento y escalabilidad futura del sistema.
 
+Por: 
+
+Miguel Luna
+
+Luis Armijos
+
+Anthony Gutierrez
