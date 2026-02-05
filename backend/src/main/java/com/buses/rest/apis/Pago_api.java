@@ -18,7 +18,6 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.GET;
 import java.util.List;
 import modelo.Pago;
-import com.buses.rest.security.Secured;
 
 @Path("/pago")
 public class Pago_api {

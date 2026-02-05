@@ -1,205 +1,428 @@
-
 import React, { useState } from 'react';
-import { View, BusTrip, CreditCard } from '../types';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { View as ViewType, CreditCard, User } from '../types';
 
 interface Props {
-  onNavigate: (view: View) => void;
-  trip: BusTrip | null;
+  onNavigate: (view: ViewType) => void;
+  trip: any;
   seatCount: number;
   onComplete: () => void;
   showToast: (text: string, type?: 'success' | 'error' | 'info') => void;
   savedCards: CreditCard[];
   onSaveCard: (card: Omit<CreditCard, 'id'>) => void;
+  user: User | null;
 }
 
-const PaymentView: React.FC<Props> = ({ onNavigate, trip, seatCount, onComplete, showToast, savedCards, onSaveCard }) => {
-  const totalPrice = (trip?.price || 0) * seatCount;
-  const [isProcessing, setIsProcessing] = useState(false);
+const PaymentView: React.FC<Props> = ({ 
+  onNavigate, 
+  trip, 
+  seatCount, 
+  onComplete, 
+  showToast,
+  savedCards,
+  onSaveCard,
+}) => {
   const [cardNumber, setCardNumber] = useState('');
+  const [cardHolder, setCardHolder] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
-  const [cardholder, setCardholder] = useState('');
-  const [saveForFuture, setSaveForFuture] = useState(false);
-  const [selectedCardId, setSelectedCardId] = useState<string | 'new'>('new');
+  const [saveCard, setSaveCard] = useState(false);
 
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 16);
-    setCardNumber(value);
-  };
-
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length > 4) value = value.slice(0, 4);
-    if (value.length >= 3) {
-      value = value.slice(0, 2) + '/' + value.slice(2);
-    }
-    setExpiryDate(value);
-  };
-
-  const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 3);
-    setCvv(value);
-  };
+  const total = seatCount * (trip?.price || 25);
 
   const handlePayment = () => {
-    setIsProcessing(true);
-    
-    // Si se eligió guardar la tarjeta nueva
-    if (selectedCardId === 'new' && saveForFuture) {
+    if (!cardNumber || !cardHolder || !expiryDate || !cvv) {
+      showToast('Por favor completa todos los campos', 'error');
+      return;
+    }
+
+    if (saveCard) {
       onSaveCard({
         number: cardNumber.slice(-4),
-        holder: cardholder,
+        holder: cardHolder,
         expiry: expiryDate,
-        brand: 'visa' // Simplificación
+        brand: 'visa',
       });
     }
 
-    setTimeout(() => {
-      setIsProcessing(false);
-      onComplete();
-    }, 2000);
+    onComplete();
   };
 
-  const isFormValid = selectedCardId !== 'new' || (cardNumber.length === 16 && expiryDate.length === 5 && cvv.length === 3 && cardholder);
-
   return (
-    <div className="flex flex-col h-full bg-[#141414] text-white overflow-hidden font-sans">
-      <header className="flex items-center p-4 pt-12 pb-4 bg-[#141414] border-b border-white/5">
-        <button 
-          onClick={() => onNavigate(View.SEAT_SELECTION)}
-          className="text-white flex size-12 items-center justify-center cursor-pointer"
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => onNavigate(ViewType.SEAT_SELECTION)}
         >
-          <span className="material-symbols-outlined text-[28px]">arrow_back_ios_new</span>
-        </button>
-        <h2 className="text-white text-[18px] font-bold flex-1 text-center pr-12 tracking-tight">Pago Seguro</h2>
-      </header>
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Pago</Text>
+        <View style={styles.headerSpacer} />
+      </View>
 
-      <div className="flex-1 overflow-y-auto hide-scrollbar px-6 py-6 pb-40">
-        <div className="mb-8">
-          <h3 className="text-neutral-500 text-[11px] font-bold uppercase tracking-[0.15em] mb-4">Resumen de Pedido</h3>
-          <div className="bg-[#1c1c1c] rounded-2xl p-6 border border-white/5 space-y-4 shadow-xl">
-            <div className="flex justify-between items-start">
-              <div className="space-y-1">
-                <p className="text-white text-[17px] font-bold leading-tight">{trip?.origin} → {trip?.destination}</p>
-                <p className="text-neutral-500 text-[10px] font-bold uppercase tracking-wider">
-                  {trip?.company} • {trip?.class}
-                </p>
-              </div>
-            </div>
-            <div className="h-[1px] bg-white/5"></div>
-            <div className="space-y-3 pt-1">
-              <div className="flex justify-between text-[14px]">
-                <span className="text-neutral-400 font-medium">Tickets ({seatCount}x)</span>
-                <span className="text-white font-bold">${totalPrice.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-white text-[16px] font-bold">Total a Pagar</span>
-                <span className="text-accent-green text-[20px] font-black">${totalPrice.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <ScrollView 
+        style={styles.scrollView}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Order Summary */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Resumen del Pedido</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Ruta</Text>
+            <Text style={styles.summaryValue}>
+              {trip?.origin} → {trip?.destination}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Asientos</Text>
+            <Text style={styles.summaryValue}>{seatCount}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Precio unitario</Text>
+            <Text style={styles.summaryValue}>${trip?.price || 25}</Text>
+          </View>
+          <View style={[styles.summaryRow, styles.summaryTotal]}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+          </View>
+        </View>
 
-        <div className="space-y-6">
-          <h3 className="text-neutral-500 text-[11px] font-bold uppercase tracking-[0.15em] mb-2">Método de Pago</h3>
+        {/* Payment Form */}
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Datos de Pago</Text>
           
-          {/* Tarjetas Guardadas */}
-          {savedCards.length > 0 && (
-            <div className="space-y-3">
-              {savedCards.map(card => (
-                <button 
-                  key={card.id}
-                  onClick={() => setSelectedCardId(card.id)}
-                  className={`w-full p-4 rounded-xl border flex items-center justify-between transition-all ${selectedCardId === card.id ? 'bg-accent-green/10 border-accent-green' : 'bg-surface-dark border-white/5'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-white/50">credit_card</span>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-white uppercase">{card.brand} •••• {card.number}</p>
-                      <p className="text-[10px] text-neutral-500 font-medium uppercase">{card.holder}</p>
-                    </div>
-                  </div>
-                  {selectedCardId === card.id && (
-                    <span className="material-symbols-outlined text-accent-green">check_circle</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+          <View style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>Número de Tarjeta</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="1234 5678 9012 3456"
+              placeholderTextColor="rgba(255, 255, 255, 0.3)"
+              value={cardNumber}
+              onChangeText={setCardNumber}
+              keyboardType="numeric"
+              maxLength={19}
+            />
+          </View>
 
-          <button 
-            onClick={() => setSelectedCardId('new')}
-            className={`w-full p-4 rounded-xl border flex items-center gap-3 transition-all ${selectedCardId === 'new' ? 'bg-accent-green/10 border-accent-green' : 'bg-surface-dark border-white/5'}`}
+          <View style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>Titular de la Tarjeta</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="JUAN PEREZ"
+              placeholderTextColor="rgba(255, 255, 255, 0.3)"
+              value={cardHolder}
+              onChangeText={setCardHolder}
+              autoCapitalize="characters"
+            />
+          </View>
+
+          <View style={styles.row}>
+            <View style={styles.halfField}>
+              <Text style={styles.fieldLabel}>Fecha de Vencimiento</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="MM/AA"
+                placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                value={expiryDate}
+                onChangeText={setExpiryDate}
+                keyboardType="numeric"
+                maxLength={5}
+              />
+            </View>
+
+            <View style={styles.halfField}>
+              <Text style={styles.fieldLabel}>CVV</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="123"
+                placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                value={cvv}
+                onChangeText={setCvv}
+                keyboardType="numeric"
+                maxLength={4}
+                secureTextEntry
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.checkbox}
+            onPress={() => setSaveCard(!saveCard)}
+            activeOpacity={0.7}
           >
-            <span className="material-symbols-outlined text-white/50">add</span>
-            <span className="text-sm font-bold text-white">Usar Nueva Tarjeta</span>
-          </button>
+            <View style={[styles.checkboxBox, saveCard && styles.checkboxChecked]}>
+              {saveCard && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.checkboxText}>Guardar tarjeta para futuros pagos</Text>
+          </TouchableOpacity>
+        </View>
 
-          {selectedCardId === 'new' && (
-            <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="space-y-2">
-                <p className="text-white text-[13px] font-bold ml-1">Nombre del Titular</p>
-                <input 
-                  value={cardholder}
-                  onChange={(e) => setCardholder(e.target.value)}
-                  className="w-full h-14 bg-[#1c1c1c] border border-white/10 rounded-xl px-4 text-white text-[15px] focus:outline-none focus:border-accent-green transition-colors placeholder:text-neutral-600" 
-                  placeholder="Juan Perez" 
-                />
-              </div>
-              <div className="space-y-2">
-                <p className="text-white text-[13px] font-bold ml-1">Número de Tarjeta</p>
-                <input 
-                  value={cardNumber}
-                  onChange={handleCardNumberChange}
-                  type="text"
-                  inputMode="numeric"
-                  className="w-full h-14 bg-[#1c1c1c] border border-white/10 rounded-xl px-4 text-white text-[15px] focus:outline-none focus:border-accent-green transition-colors placeholder:text-neutral-600" 
-                  placeholder="1234 5678 9101 1121" 
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <input 
-                  value={expiryDate}
-                  onChange={handleExpiryChange}
-                  className="h-14 bg-[#1c1c1c] border border-white/10 rounded-xl px-4 text-white text-[15px] focus:outline-none focus:border-accent-green" 
-                  placeholder="MM/YY" 
-                />
-                <input 
-                  value={cvv}
-                  onChange={handleCvvChange}
-                  className="h-14 bg-[#1c1c1c] border border-white/10 rounded-xl px-4 text-white text-[15px] focus:outline-none focus:border-accent-green" 
-                  placeholder="CVV" 
-                />
-              </div>
-              
-              <label className="flex items-center gap-3 cursor-pointer group pt-2">
-                <div className={`size-6 rounded-md border flex items-center justify-center transition-all ${saveForFuture ? 'bg-accent-green border-accent-green' : 'border-white/10'}`}>
-                  {saveForFuture && <span className="material-symbols-outlined text-primary text-sm font-bold">check</span>}
-                  <input type="checkbox" className="hidden" checked={saveForFuture} onChange={() => setSaveForFuture(!saveForFuture)} />
-                </div>
-                <span className="text-xs text-neutral-400 font-medium select-none">Guardar esta tarjeta para futuros viajes</span>
-              </label>
-            </div>
-          )}
-        </div>
-      </div>
+        {/* Saved Cards */}
+        {savedCards.length > 0 && (
+          <View style={styles.savedCardsCard}>
+            <Text style={styles.savedCardsTitle}>Tarjetas Guardadas</Text>
+            {savedCards.map((card) => (
+              <TouchableOpacity
+                key={card.id}
+                style={styles.savedCard}
+                onPress={() => {
+                  setCardNumber(`**** **** **** ${card.number}`);
+                  setCardHolder(card.holder);
+                  setExpiryDate(card.expiry);
+                }}
+              >
+                <Text style={styles.savedCardNumber}>**** **** **** {card.number}</Text>
+                <Text style={styles.savedCardHolder}>{card.holder}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] p-6 pb-12 bg-gradient-to-t from-[#141414] via-[#141414]/95 to-transparent">
-        <button 
-          disabled={isProcessing || !isFormValid}
-          onClick={handlePayment}
-          className="w-full h-16 bg-accent-green text-primary font-black rounded-2xl flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-all disabled:opacity-30"
+      {/* Bottom Bar */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={styles.payButton}
+          onPress={handlePayment}
+          activeOpacity={0.9}
         >
-          {isProcessing ? (
-            <div className="flex items-center gap-2">
-               <span className="material-symbols-outlined animate-spin">refresh</span>
-               <span>Procesando Pago...</span>
-            </div>
-          ) : `PAGAR $${totalPrice.toFixed(2)}`}
-        </button>
-      </div>
-    </div>
+          <Text style={styles.payButtonText}>Pagar ${total.toFixed(2)} 💳</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0A0A0A',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 16,
+  },
+  backButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIcon: {
+    fontSize: 24,
+    color: '#FFFFFF',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 48,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  summaryCard: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+    backgroundColor: '#1c1c1c',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  summaryTotal: {
+    marginTop: 12,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    marginBottom: 0,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  totalValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#2ecc71',
+  },
+  formCard: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+    backgroundColor: '#1c1c1c',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  formTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 16,
+  },
+  fieldContainer: {
+    marginBottom: 16,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 8,
+  },
+  input: {
+    height: 48,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  halfField: {
+    flex: 1,
+  },
+  checkbox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  checkboxBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#2ecc71',
+    borderColor: '#2ecc71',
+  },
+  checkmark: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  checkboxText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  savedCardsCard: {
+    marginHorizontal: 24,
+    marginBottom: 120,
+    backgroundColor: '#1c1c1c',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  savedCardsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 16,
+  },
+  savedCard: {
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  savedCardNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  savedCardHolder: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#1c1c1c',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  payButton: {
+    height: 56,
+    backgroundColor: '#2ecc71',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2ecc71',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  payButtonText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000000',
+  },
+});
 
 export default PaymentView;

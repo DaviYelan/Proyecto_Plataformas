@@ -47,11 +47,11 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Desktop Nav */}
             <div className="hidden md:flex items-center space-x-8">
-              <button onClick={onDestinationsClick} className="text-gray-300 hover:text-[#2ecc71] transition-colors text-sm font-medium">Destinos</button>
+              <button onClick={onDestinationsClick} className="text-[#2ecc71] hover:text-[#27ae60] transition-colors text-sm font-medium">Destinos</button>
               {user?.role !== 'admin' && (
-                <button onClick={onMyTicketsClick} className="text-gray-300 hover:text-[#2ecc71] transition-colors text-sm font-medium">Mis Boletos</button>
+                <button onClick={onMyTicketsClick} className="text-[#2ecc71] hover:text-[#27ae60] transition-colors text-sm font-medium">Mis Boletos</button>
               )}
-              <button onClick={onHelpClick} className="text-gray-300 hover:text-[#2ecc71] transition-colors text-sm font-medium">Ayuda</button>
+              <button onClick={onHelpClick} className="text-[#2ecc71] hover:text-[#27ae60] transition-colors text-sm font-medium">Ayuda</button>
               
               {user ? (
                  <button 

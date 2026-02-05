@@ -1,6 +1,9 @@
-
-import React, { useState } from 'react';
-import { View, User, SearchCriteria, ToastMessage } from './types';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, SafeAreaView } from 'react-native';
+import { View as RNView, Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, User, SearchCriteria, ToastMessage, CreditCard, BusTrip } from './types';
+import { apiService } from './services/apiService';
 import WelcomeView from './views/WelcomeView';
 import RegisterView from './views/RegisterView';
 import HomeView from './views/HomeView';
@@ -26,8 +29,152 @@ const App: React.FC = () => {
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({
     origin: 'Quito',
     destination: 'Guayaquil',
-    date: '24 Oct, 2023'
+    date: '27 Jan, 2026'
   });
+  const [savedCards, setSavedCards] = useState<CreditCard[]>([]);
+  const [myTrips, setMyTrips] = useState<BusTrip[]>([]);
+
+  useEffect(() => {
+    const loadStoredData = async () => {
+      try {
+        const storedCards = await AsyncStorage.getItem('savedCards');
+        const storedTrips = await AsyncStorage.getItem('myTrips');
+        if (storedCards) {
+          try {
+            setSavedCards(JSON.parse(storedCards));
+          } catch (e) {
+            console.error('Error parsing cards:', e);
+          }
+        }
+        if (storedTrips) {
+          try {
+            setMyTrips(JSON.parse(storedTrips));
+          } catch (e) {
+            console.error('Error parsing trips:', e);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading stored data:', error);
+      }
+    };
+
+    const timer = setTimeout(loadStoredData, 300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const saveCards = async () => {
+      if (savedCards.length > 0) {
+        try {
+          await AsyncStorage.setItem('savedCards', JSON.stringify(savedCards));
+        } catch (error) {
+          console.error('Error saving cards:', error);
+        }
+      }
+    };
+    saveCards();
+  }, [savedCards]);
+
+  useEffect(() => {
+    const saveTrips = async () => {
+      if (myTrips.length > 0) {
+        try {
+          await AsyncStorage.setItem('myTrips', JSON.stringify(myTrips));
+        } catch (error) {
+          console.error('Error saving trips:', error);
+        }
+      }
+    };
+    saveTrips();
+  }, [myTrips]);
+
+  useEffect(() => {
+    if (user && currentView === View.WELCOME) {
+      setCurrentView(View.HOME);
+    }
+  }, [user, currentView]);
+
+  const handleSaveCard = (card: Omit<CreditCard, 'id'>) => {
+    const newCard: CreditCard = {
+      ...card,
+      id: Date.now().toString()
+    };
+    setSavedCards(prev => [...prev, newCard]);
+    showToast('Tarjeta guardada exitosamente', 'success');
+  };
+
+  const handleDeleteCard = (cardId: string) => {
+    setSavedCards(prev => prev.filter(c => c.id !== cardId));
+    showToast('Tarjeta eliminada', 'info');
+  };
+
+  const handleCompletePayment = async () => {
+    if (selectedTrip && selectedSeats.length > 0 && user) {
+      try {
+        const personasResponse = await apiService.get('/persona/lista');
+        const personas = personasResponse.data?.personas || personasResponse.personas || personasResponse.data || [];
+        const persona = personas.find((p: any) => p.correo === user.email);
+
+        if (!persona) {
+          showToast('Error: No se encontró el usuario', 'error');
+          return;
+        }
+
+        if (!persona.id_persona) {
+          showToast('Error: El usuario no tiene ID válido', 'error');
+          return;
+        }
+
+        const turnosResponse = await apiService.get('/turno/lista');
+        const turnos = turnosResponse.data?.turnos || turnosResponse.turnos || turnosResponse.data || [];
+
+        const turno = turnos.find((t: any) => {
+          const rutaId = t.horario?.ruta?.id_ruta?.toString();
+          const rutaOrigen = t.horario?.ruta?.origen;
+          const rutaDestino = t.horario?.ruta?.destino;
+          const estadoTurno = t.estado_turno;
+
+          const coincideId = rutaId === selectedTrip.id;
+          const coincideRuta = rutaOrigen === selectedTrip.origin && rutaDestino === selectedTrip.destination;
+
+          return (coincideId || coincideRuta) && estadoTurno === 'Disponible';
+        });
+
+        if (!turno) {
+          showToast('Error: No hay turnos disponibles para esta ruta', 'error');
+          return;
+        }
+
+        const asientosNumeros = selectedSeats.map(seat => parseInt(seat));
+
+        const boletoData = {
+          persona: {
+            id_persona: persona.id_persona
+          },
+          turno: {
+            id_turno: turno.id_turno
+          },
+          asientos: asientosNumeros,
+          precio_unitario: selectedTrip.price
+        };
+
+        await apiService.post('/boleto/guardar', boletoData);
+
+        const newTrip: BusTrip = {
+          ...selectedTrip,
+          bookedSeats: selectedSeats,
+          bookingDate: new Date().toISOString(),
+          status: 'confirmed'
+        };
+        setMyTrips(prev => [...prev, newTrip]);
+        showToast('¡Pago exitoso! Boleto guardado', 'success');
+        setCurrentView(View.TICKET);
+      } catch (error) {
+        console.error('Error al guardar boleto:', error);
+        showToast('Error al procesar el pago', 'error');
+      }
+    }
+  };
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ text, type });
@@ -41,13 +188,17 @@ const App: React.FC = () => {
       case View.REGISTER:
         return <RegisterView onNavigate={setCurrentView} onBack={() => setCurrentView(View.WELCOME)} showToast={showToast} />;
       case View.HOME:
-        return <HomeView onNavigate={setCurrentView} searchCriteria={searchCriteria} onSearchUpdate={setSearchCriteria} />;
+        return <HomeView onNavigate={setCurrentView} searchCriteria={searchCriteria} onSearchUpdate={setSearchCriteria} user={user} />;
       case View.RESULTS:
-        return <ResultsView onNavigate={setCurrentView} searchCriteria={searchCriteria} onSelectTrip={(trip) => { setSelectedTrip(trip); setCurrentView(View.SEAT_SELECTION); }} />;
+        return <ResultsView onNavigate={setCurrentView} searchCriteria={searchCriteria} onSelectTrip={(trip) => {
+          setSelectedTrip(trip);
+          setSelectedSeats([]);
+          setCurrentView(View.SEAT_SELECTION);
+        }} />;
       case View.SEAT_SELECTION:
         return <SeatSelectionView onNavigate={setCurrentView} trip={selectedTrip} onSeatsChange={setSelectedSeats} selectedSeats={selectedSeats} />;
       case View.PAYMENT:
-        return <PaymentView onNavigate={setCurrentView} trip={selectedTrip} seatCount={selectedSeats.length} onComplete={() => setCurrentView(View.TICKET)} showToast={showToast} savedCards={[]} onSaveCard={() => {}} />;
+        return <PaymentView onNavigate={setCurrentView} trip={selectedTrip} seatCount={selectedSeats.length} onComplete={handleCompletePayment} showToast={showToast} savedCards={savedCards} onSaveCard={handleSaveCard} user={user} />;
       case View.TICKET:
         return <TicketView onNavigate={setCurrentView} trip={selectedTrip} seats={selectedSeats} date={searchCriteria.date} showToast={showToast} onDownload={() => {}} />;
       case View.AI_CHAT:
@@ -55,7 +206,7 @@ const App: React.FC = () => {
       case View.PROFILE:
         return <ProfileView onNavigate={setCurrentView} user={user} onLogout={() => { setUser(null); setCurrentView(View.WELCOME); }} />;
       case View.MY_TRIPS:
-        return <MyTripsView onNavigate={setCurrentView} myTrips={[]} onSelectTrip={(trip) => { setSelectedTrip(trip); setCurrentView(View.TICKET); }} onTrackTrip={(trip) => { setSelectedTrip(trip); setCurrentView(View.TRACK_TRIP); }} />;
+        return <MyTripsView onNavigate={setCurrentView} myTrips={myTrips} onSelectTrip={(trip) => { setSelectedTrip(trip); setSelectedSeats(trip.bookedSeats || []); setCurrentView(View.TICKET); }} onTrackTrip={(trip) => { setSelectedTrip(trip); setCurrentView(View.TRACK_TRIP); }} user={user} />;
       case View.NOTIFICATIONS:
         return <NotificationsView onNavigate={setCurrentView} />;
       case View.HELP_CENTER:
@@ -63,7 +214,7 @@ const App: React.FC = () => {
       case View.PERSONAL_INFO:
         return <PersonalInfoView onBack={() => setCurrentView(View.PROFILE)} user={user} />;
       case View.PAYMENT_METHODS:
-        return <PaymentMethodsView onBack={() => setCurrentView(View.PROFILE)} savedCards={[]} onSaveCard={() => {}} onDeleteCard={() => {}} />;
+        return <PaymentMethodsView onBack={() => setCurrentView(View.PROFILE)} savedCards={savedCards} onSaveCard={handleSaveCard} onDeleteCard={handleDeleteCard} user={user} />;
       case View.TRACK_TRIP:
         return <TrackTripView trip={selectedTrip} onBack={() => setCurrentView(View.MY_TRIPS)} showToast={showToast} />;
       default:
@@ -72,24 +223,66 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-black">
-      <div className="relative w-full max-w-[430px] h-screen sm:h-[932px] overflow-hidden bg-[#0A0A0A] shadow-2xl flex flex-col font-sans border-x border-white/5 animate-fade-in">
+    <SafeAreaView style={styles.container}>
+      <RNView style={styles.mainContainer}>
         {toast && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[200] w-[85%]">
-            <div className={`px-5 py-4 rounded-2xl bg-black/80 backdrop-blur-xl border flex items-center gap-3 ${
-              toast.type === 'success' ? 'border-accent-green/30 text-accent-green' : 'text-white border-white/10'
-            }`}>
-              <span className="material-symbols-outlined">{toast.type === 'success' ? 'check_circle' : 'info'}</span>
-              <p className="text-sm font-bold">{toast.text}</p>
-            </div>
-          </div>
+          <RNView style={styles.toastContainer}>
+            <RNView style={[
+              styles.toast,
+              toast.type === 'success' ? styles.toastSuccess : styles.toastInfo
+            ]}>
+              <Text style={styles.toastText}>{toast.text}</Text>
+            </RNView>
+          </RNView>
         )}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
+        <RNView style={styles.contentContainer}>
           {renderView()}
-        </div>
-      </div>
-    </div>
+        </RNView>
+      </RNView>
+    </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#0A0A0A',
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: 64,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 200,
+    paddingHorizontal: 30,
+  },
+  toast: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderWidth: 1,
+    width: '100%'
+  },
+  toastSuccess: {
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  toastInfo: {
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  toastText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  contentContainer: {
+    flex: 1,
+  },
+});
 
 export default App;

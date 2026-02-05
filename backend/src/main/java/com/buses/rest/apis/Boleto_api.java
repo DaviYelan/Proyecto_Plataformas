@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Arrays;
 import javax.ws.rs.POST;
-import com.buses.rest.security.Secured;
 import javax.ws.rs.Path;
 import modelo.Descuento;
 import javax.ws.rs.PUT;
@@ -71,7 +70,6 @@ public class Boleto_api {
     @SuppressWarnings("unchecked")
     @Path("/guardar")
     @POST
-    @Secured(roles = {"ADMIN", "CLIENTE"})
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response save(HashMap<String, Object> map) {
@@ -181,7 +179,6 @@ public class Boleto_api {
 
     @Path("/eliminar/{id}")
     @DELETE
-    @Secured(roles = {"ADMIN"})
     @Produces(MediaType.APPLICATION_JSON)
     public Response delete(@PathParam("id") Integer id) {
         HashMap<String, Object> response = new HashMap<>();
@@ -204,7 +201,6 @@ public class Boleto_api {
 
     @Path("/actualizar")
     @PUT
-    @Secured(roles = {"ADMIN"})
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response update(HashMap<String, Object> map) {
@@ -374,7 +370,6 @@ public class Boleto_api {
      */
     @Path("/comprar")
     @POST
-    @Secured(roles = {"ADMIN", "CLIENTE"})
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response comprar(HashMap<String, Object> map) {

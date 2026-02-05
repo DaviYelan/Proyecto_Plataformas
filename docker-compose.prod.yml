@@ -29,6 +29,15 @@ services:
       - ./backend/.env
     depends_on:
       - backend
+  mobile:
+    build: ./mobile
+    image: buses-mobile-local:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - API_URL=http://backend:8099
+    depends_on:
+      - backend
 
 networks:
   default:

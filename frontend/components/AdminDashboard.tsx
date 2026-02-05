@@ -772,8 +772,8 @@ const ManageCooperatives = ({ data, onAdd, onEdit, onDelete }: any) => (
                             <td className="px-6 py-4">{c.phone || 'N/A'}</td>
                             <td className="px-6 py-4">{c.email}</td>
                             <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                <button onClick={() => onEdit(c)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
-                                <button onClick={() => onDelete(c.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                                <button onClick={() => onEdit(c)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(c.id)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Trash2 size={16}/></button>
                             </td>
                         </tr>
                     ))}
@@ -820,8 +820,8 @@ const ManageBuses = ({ data, onAdd, onEdit, onDelete }: any) => (
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                <button onClick={() => onEdit(b)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
-                                <button onClick={() => onDelete(b.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                                <button onClick={() => onEdit(b)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(b.id)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Trash2 size={16}/></button>
                             </td>
                         </tr>
                     ))}
@@ -864,8 +864,8 @@ const ManageRoutes = ({ data, onAdd, onEdit, onDelete }: any) => (
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                <button onClick={() => onEdit(r)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
-                                <button onClick={() => onDelete(r.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                                <button onClick={() => onEdit(r)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(r.id)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Trash2 size={16}/></button>
                             </td>
                         </tr>
                     ))}
@@ -910,8 +910,8 @@ const ManageSchedules = ({ data, onAdd, onEdit, onDelete }: any) => (
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                <button onClick={() => onEdit(t)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
-                                <button onClick={() => onDelete(t.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                                <button onClick={() => onEdit(t)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(t.id)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Trash2 size={16}/></button>
                             </td>
                         </tr>
                     ))}
@@ -954,8 +954,8 @@ const ManageUsers = ({ data, onAdd, onEdit, onDelete }: any) => (
                           <td className="px-6 py-4 font-bold text-[#2ecc71]">${u.balance?.toFixed(2) || '0.00'}</td>
                           <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs ${u.role === 'admin' ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400'}`}>{u.role === 'admin' ? 'Admin' : 'Cliente'}</span></td>
                           <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                <button onClick={() => onEdit(u)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
-                                <button onClick={() => onDelete(u.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                                <button onClick={() => onEdit(u)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(u.id)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Trash2 size={16}/></button>
                           </td>
                       </tr>
                   ))}
@@ -988,8 +988,8 @@ const ManageScales = ({ data, onAdd, onEdit, onDelete }: any) => (
                           <td className="px-6 py-4 font-bold text-white">{s.location}</td>
                           <td className="px-6 py-4">{s.arrivalTime}</td>
                           <td className="px-6 py-4 text-right flex justify-end gap-2">
-                              <button onClick={() => onEdit(s)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
-                              <button onClick={() => onDelete(s.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                              <button onClick={() => onEdit(s)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Edit size={16}/></button>
+                              <button onClick={() => onDelete(s.id)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Trash2 size={16}/></button>
                           </td>
                       </tr>
                   ))}
@@ -1032,8 +1032,8 @@ const ManageDiscounts = ({ data, onAdd, onEdit, onDelete }: any) => (
                               </span>
                           </td>
                           <td className="px-6 py-4 text-right flex justify-end gap-2">
-                              <button onClick={() => onEdit(d)} className="text-blue-400 hover:bg-gray-700 p-2 rounded"><Edit size={16}/></button>
-                              <button onClick={() => onDelete(d.id)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><Trash2 size={16}/></button>
+                              <button onClick={() => onEdit(d)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Edit size={16}/></button>
+                              <button onClick={() => onDelete(d.id)} className="text-[#2ecc71] hover:text-[#24a038] p-2 rounded transition-colors"><Trash2 size={16}/></button>
                           </td>
                       </tr>
                   ))}

@@ -1,6 +1,4 @@
 package com.buses.rest.apis;
-
-import com.buses.rest.security.Secured;
 import controlador.servicios.Controlador_escala;
 import controlador.servicios.Controlador_ruta;
 import controlador.servicios.Controlador_bus;

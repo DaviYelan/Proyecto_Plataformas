@@ -18,7 +18,6 @@ import java.util.Arrays;
 import javax.ws.rs.PUT;
 import javax.ws.rs.GET;
 import modelo.Bus;
-import com.buses.rest.security.Secured;
 
 //@Secured(roles = {"Administrador"})
 @Path("/bus")

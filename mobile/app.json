@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "BusGo Ecuador",
+    "slug": "busgo-ecuador-app",
+    "version": "1.0.3",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [],
+    "runtimeVersion": "1.0.3",
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0
+    },
+    "plugins": [],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.busgomobile"
+    },
+    "android": {
+      "package": "com.busgomobile",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A0A"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
