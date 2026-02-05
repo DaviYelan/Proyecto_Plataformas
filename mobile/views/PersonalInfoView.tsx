@@ -40,6 +40,7 @@ const PersonalInfoView: React.FC<Props> = ({ onBack, user }) => (
   </View>
 );
 
+<<<<<<< HEAD
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0A0A' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16 },
@@ -54,5 +55,39 @@ const styles = StyleSheet.create({
   saveButton: { marginTop: 24, height: 56, backgroundColor: '#2ecc71', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   saveButtonText: { fontSize: 16, fontWeight: '900', color: '#000000' },
 });
+=======
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar">
+        <div className="space-y-4">
+          <div className="bg-surface-dark p-5 rounded-2xl border border-white/5 shadow-lg">
+             <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Nombre Completo</p>
+             <p className="text-white text-base font-bold">{user?.name}</p>
+          </div>
+          <div className="bg-surface-dark p-5 rounded-2xl border border-white/5 shadow-lg">
+             <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Correo Electrónico</p>
+             <p className="text-white text-base font-bold">{user?.email}</p>
+          </div>
+          <div className="bg-surface-dark p-5 rounded-2xl border border-white/5 shadow-lg">
+             <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Número de Teléfono</p>
+             <p className="text-white text-base font-bold">{user?.phone || 'No registrado'}</p>
+          </div>
+          <div className="bg-surface-dark p-5 rounded-2xl border border-white/5 shadow-lg">
+             <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Identificación (Cédula/Pasaporte)</p>
+             <p className="text-white text-base font-bold">{user?.idNumber || 'No registrado'}</p>
+          </div>
+        </div>
+
+        <button className="w-full h-14 bg-[#2ecc71] text-black font-bold rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-[#27ae60] shadow-lg shadow-[#2ecc71]/30">
+          <span className="material-symbols-outlined">edit</span>
+          Editar Información
+        </button>
+
+        <p className="text-center text-neutral-600 text-xs px-8">
+          Tu información está protegida por nuestra política de privacidad y se utiliza únicamente para la emisión de boletos legales en Ecuador.
+        </p>
+      </div>
+    </div>
+  );
+};
+>>>>>>> origin/develop
 
 export default PersonalInfoView;

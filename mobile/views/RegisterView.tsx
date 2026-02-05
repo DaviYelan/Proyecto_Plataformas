@@ -130,6 +130,7 @@ const RegisterView: React.FC<Props> = ({ onNavigate, onBack, showToast }) => {
           </View>
         </View>
 
+<<<<<<< HEAD
         <View style={styles.section}>
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Correo Electrónico</Text>
@@ -178,6 +179,59 @@ const RegisterView: React.FC<Props> = ({ onNavigate, onBack, showToast }) => {
             style={styles.checkbox}
             onPress={() => setAcceptedTerms(!acceptedTerms)}
             activeOpacity={0.7}
+=======
+        <div className="px-6 py-2">
+          <div className="flex flex-col gap-4">
+            <label className="flex flex-col w-full">
+              <p className="text-white text-sm font-medium pb-2 ml-1">Correo Electrónico</p>
+              <input required className="flex w-full rounded-xl text-white border border-white/10 bg-surface-dark h-14 placeholder:text-neutral-600 p-4 text-base font-normal focus:outline-none focus:border-accent-green transition-all" placeholder="juan.perez@ejemplo.ec" type="email" />
+            </label>
+            <label className="flex flex-col w-full">
+              <div className="flex justify-between items-center mb-2 pr-1">
+                <p className="text-white text-sm font-medium ml-1">Contraseña</p>
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[#2ecc71] text-[10px] font-bold uppercase tracking-widest"
+                >
+                  {showPassword ? 'Ocultar' : 'Ver'}
+                </button>
+              </div>
+              <div className="relative">
+                <input 
+                  required
+                  className="flex w-full rounded-xl text-white border border-white/10 bg-surface-dark h-14 placeholder:text-neutral-600 p-4 pr-12 text-base font-normal focus:outline-none focus:border-accent-green transition-all" 
+                  placeholder="••••••••••••" 
+                  type={showPassword ? "text" : "password"} 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-4 text-neutral-500 hover:text-white transition-colors"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    {showPassword ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div className="px-6 py-4">
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <input required className="rounded text-[#2ecc71] focus:ring-[#2ecc71] bg-transparent border-white/10 size-5" type="checkbox" />
+            <span className="text-sm text-neutral-500 group-hover:text-neutral-400 transition-colors">
+              Acepto los <span className="text-[#2ecc71] font-bold">Términos y Condiciones</span> y la <span className="text-[#2ecc71] font-bold">Política de Privacidad</span>.
+            </span>
+          </label>
+        </div>
+
+        <div className="px-6 pt-4 pb-12">
+          <button 
+            type="submit"
+            className="w-full bg-[#2ecc71] hover:bg-[#27ae60] text-black font-black h-16 rounded-xl shadow-xl shadow-[#2ecc71]/50 transition-all active:scale-[0.98]"
+>>>>>>> origin/develop
           >
             <View style={[styles.checkboxBox, acceptedTerms && styles.checkboxChecked]}>
               {acceptedTerms && <Text style={styles.checkmark}>✓</Text>}
