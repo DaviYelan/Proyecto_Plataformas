@@ -3,7 +3,7 @@
 <div align="center">
 
 ![Estado del Proyecto](https://img.shields.io/badge/Estado-En%20Desarrollo-yellow)
-![Versión](https://img.shields.io/badge/Versión-1.0.0-blue)
+![Versión](https://img.shields.io/badge/Versión-1.9.1-blue)
 ![Licencia](https://img.shields.io/badge/Licencia-MIT-green)
 ![Contribuidores](https://img.shields.io/badge/Contribuidores-3-orange)
 
@@ -1723,7 +1723,7 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo [LICENSE](LICENSE) para
 ```
 MIT License
 
-Copyright (c) 2024 Grupo 4 - Sistema de Boletos de Bus
+Copyright (c) 2025/2026 Grupo 4 - Sistema de Boletos de Bus
 
 Se concede permiso, libre de cargos, a cualquier persona que obtenga una copia
 de este software y de los archivos de documentación asociados (el "Software"),
@@ -1743,16 +1743,16 @@ y/o vender copias del Software...
 - **Carrera**: Computación
 - **Asignatura**: Desarrollo Basado en Plataformas
 - **Ciclo**: 5to A
-- **Año Académico**: 2024-2025
+- **Año Académico**: 2025-2026
 
 ### Canales de Comunicación
 
 | Canal | Información |
 |-------|-------------|
-| **Email del equipo** | grupo4.boletos@example.com |
-| **Repositorio** | [GitHub](https://github.com/grupo4/sistema-boletos-bus) |
-| **Documentación** | [Wiki del proyecto](https://github.com/grupo4/sistema-boletos-bus/wiki) |
-| **Issues** | [Issue Tracker](https://github.com/grupo4/sistema-boletos-bus/issues) |
+| **Email del equipo** | grupo4.boletos@unl.edu.ec |
+| **Repositorio** | [GitHub](https://github.com/DaviYelan/Proyecto_Plataformas.git) |
+| **Documentación** | [Wiki del proyecto](https://github.com/DaviYelan/Proyecto_Plataformas.git) |
+| **Issues** | [Issue Tracker](https://github.com/DaviYelan/Proyecto_Plataformas.git) |
 
 ### Soporte
 
@@ -1812,7 +1812,7 @@ Queremos agradecer a:
 
 **Desarrollado con ❤️ por el Grupo 4**
 
-Universidad Nacional de Loja • 2024
+Universidad Nacional de Loja • 2025 - 2026
 
 [![Status](https://img.shields.io/badge/Status-En%20Desarrollo-yellow)]()
 [![License](https://img.shields.io/badge/License-MIT-green)]()
