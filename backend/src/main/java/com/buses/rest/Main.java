@@ -56,8 +56,10 @@ public class Main {
     // scan both the normal package names and variants that include the 'main.java' prefix
     .packages("com.buses.rest")
     .packages("com.buses.rest.apis")
+    .packages("com.buses.rest.security")
     .packages("main.java.com.buses.rest")
     .packages("main.java.com.buses.rest.apis")
+    .packages("main.java.com.buses.rest.security")
     // Registrar Jackson para serialización/deserialización JSON
     .register(JacksonFeature.class)
     // Desactivar WADL para evitar que Jersey intente inicializar JAXB en tiempo de arranque

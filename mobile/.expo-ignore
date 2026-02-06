@@ -1,0 +1,8 @@
+# Expo should ignore these files
+android/
+ios/
+.gradle/
+build/
+dist/
+*.apk
+*.aab

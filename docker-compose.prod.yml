@@ -24,8 +24,18 @@ services:
       - FLASK_SECRET_KEY=QjRReXlVb1ZYWG1RNkF4bG1xS0xVSWJfV1R3cV9rM2pZcXJqWnNlVQ==
     volumes:
       - ./frontend:/app
+      - ./backend/data:/app/data
     env_file:
       - ./backend/.env
+    depends_on:
+      - backend
+  mobile:
+    build: ./mobile
+    image: buses-mobile-local:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - API_URL=http://backend:8099
     depends_on:
       - backend
 

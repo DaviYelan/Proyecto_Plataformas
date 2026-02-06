@@ -12,6 +12,8 @@ public class Cuenta {
     // Intentos fallidos y control de bloqueo
     private Integer failedAttempts;
     private Long lockedUntil;
+    // Token JWT
+    private String token;
 
     public Cuenta() {
 
@@ -26,6 +28,7 @@ public class Cuenta {
         this.tipo_cuenta = tipo_cuenta;
         this.failedAttempts = 0;
         this.lockedUntil = 0L;
+        this.token = null;
     }
 
     public Integer getId_cuenta() {
@@ -82,6 +85,14 @@ public class Cuenta {
 
     public void setLockedUntil(Long lockedUntil) {
         this.lockedUntil = lockedUntil;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 
     @Override

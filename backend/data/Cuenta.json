@@ -6,7 +6,8 @@
     "estado_cuenta": "Activo",
     "tipo_cuenta": "Administrador",
     "failedAttempts": 0,
-    "lockedUntil": 0
+    "lockedUntil": 0,
+    "token": "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlcyI6WyJBZG1pbmlzdHJhZG9yIl0sInN1YiI6InZAbi5jb20iLCJpYXQiOjE3Njc1ODE3ODMsImV4cCI6MTc2NzU4NTM4M30.pYvAk-B7fq1cPLF4aj3vFKUqeITfswHKUT8Xcmm1G9w"
   },
   {
     "id_cuenta": 2,
@@ -34,14 +35,10 @@
     "correo": "nerod@gmail.com",
     "contrasenia": "toyota45*",
     "estado_cuenta": "Activo",
-    "tipo_cuenta": "Cliente"
-  },
-  {
-    "id_cuenta": 6,
-    "correo": "nerod@gmail.com",
-    "contrasenia": "toyota45*",
-    "estado_cuenta": "Activo",
-    "tipo_cuenta": "Cliente"
+    "tipo_cuenta": "Cliente",
+    "failedAttempts": 0,
+    "lockedUntil": 0,
+    "token": "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlcyI6WyJDbGllbnRlIl0sInN1YiI6Im5lcm9kQGdtYWlsLmNvbSIsImlhdCI6MTc2NzU4MDM0MSwiZXhwIjoxNzY3NTgzOTQxfQ.5eB_rA8OxYBV59hMGuSeujC7EPJSyq1epSXJJY9cKe4"
   },
   {
     "id_cuenta": 7,
@@ -105,5 +102,173 @@
     "contrasenia": "toronja2323*",
     "estado_cuenta": "Activo",
     "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 2,
+    "correo": "1@1.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Inactivo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 14,
+    "correo": "pepeperez@gmail.com",
+    "contrasenia": "Peralta5534*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 6,
+    "correo": "nerod@gmail.com",
+    "contrasenia": "toyota45*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 8,
+    "correo": "mama\u0027@gmail.com",
+    "contrasenia": "1720500139M",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 5,
+    "correo": "nerod@gmail.com",
+    "contrasenia": "toyota45*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 7,
+    "correo": "dilan@gmail.com",
+    "contrasenia": "dilan123.",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 1,
+    "correo": "v@n.com",
+    "contrasenia": "Abc4321@",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Administrador",
+    "failedAttempts": 0,
+    "lockedUntil": 0
+  },
+  {
+    "id_cuenta": 3,
+    "correo": "2@2.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Suspendido",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 12,
+    "correo": "12345@1.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 10,
+    "correo": "123@1.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 15,
+    "correo": "raules@gmail.com",
+    "contrasenia": "toronja2323*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 4,
+    "correo": "x@x.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 9,
+    "correo": "luillis@gmail.com",
+    "contrasenia": "Remolacha34*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 13,
+    "correo": "pepito@gmail.com",
+    "contrasenia": "tesla6767*",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 11,
+    "correo": "1234@1.com",
+    "contrasenia": "Abc1234@",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 16,
+    "correo": "maiguellun12@gmail.com",
+    "contrasenia": "WSvY_8qiHae9zSpG",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente",
+    "failedAttempts": 1,
+    "lockedUntil": 0
+  },
+  {
+    "id_cuenta": 17,
+    "correo": "gluna4023@gmail.com",
+    "contrasenia": "yO-k0pK7qLCzVAcc",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente",
+    "failedAttempts": 0,
+    "lockedUntil": 0
+  },
+  {
+    "id_cuenta": 18,
+    "correo": "stefanialuna2000@gmail.com",
+    "contrasenia": "juflOzjiaxllcPm8",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente",
+    "failedAttempts": 0,
+    "lockedUntil": 0
+  },
+  {
+    "id_cuenta": 19,
+    "correo": "maiguelluna14@gmail.com",
+    "contrasenia": "U95vYQtpPhjbtqs0",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente",
+    "failedAttempts": 0,
+    "lockedUntil": 0
+  },
+  {
+    "id_cuenta": 20,
+    "correo": "miguel.a.luna@unl.edu.ec",
+    "contrasenia": "7iYNCttkrVg6FOr_",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente",
+    "failedAttempts": 0,
+    "lockedUntil": 0
+  },
+  {
+    "id_cuenta": 21,
+    "correo": "maiguellun12@gmail.com",
+    "contrasenia": "k9KCURs_xgqnz7YN",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente"
+  },
+  {
+    "id_cuenta": 22,
+    "correo": "maiguelluna13@gmail.com",
+    "contrasenia": "TLSBBSH2Gm5THnyH",
+    "estado_cuenta": "Activo",
+    "tipo_cuenta": "Cliente",
+    "failedAttempts": 0,
+    "lockedUntil": 0
   }
 ]

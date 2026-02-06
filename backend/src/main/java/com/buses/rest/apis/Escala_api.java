@@ -12,7 +12,6 @@ import javax.ws.rs.DELETE;
 import java.util.HashMap;
 import java.util.Arrays;
 import javax.ws.rs.POST;
-import com.buses.rest.security.Secured;
 import javax.ws.rs.Path;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;

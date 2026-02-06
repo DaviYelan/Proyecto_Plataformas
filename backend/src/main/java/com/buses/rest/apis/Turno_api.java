@@ -1,6 +1,4 @@
 package com.buses.rest.apis;
-
-import com.buses.rest.security.Secured;
 import controlador.servicios.Controlador_horario;
 import controlador.servicios.Controlador_turno;
 import controlador.dao.utiles.Sincronizar;

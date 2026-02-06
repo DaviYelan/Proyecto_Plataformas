@@ -14,7 +14,6 @@ import java.util.HashMap;
 import modelo.Frecuencia;
 import java.util.Arrays;
 import javax.ws.rs.POST;
-import com.buses.rest.security.Secured;
 import javax.ws.rs.Path;
 import javax.ws.rs.PUT;
 import javax.ws.rs.GET;

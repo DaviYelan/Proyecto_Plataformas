@@ -1,13 +1,5 @@
 [
   {
-    "id_cooperativa": 1,
-    "nombre_cooperativa": "Cooperativa Loja",
-    "ruc": "1791234567899",
-    "direccion": "10 de agosto",
-    "telefono": "098 765 4321",
-    "correo_empresarial": "cooperativa.loja@gmail.com"
-  },
-  {
     "id_cooperativa": 2,
     "nombre_cooperativa": "Cooperativa Quito",
     "ruc": "1798745632114",
@@ -24,19 +16,67 @@
     "correo_empresarial": "cooperativa.cuenca@gmail.com"
   },
   {
-    "id_cooperativa": 4,
-    "nombre_cooperativa": "Cooperativa guayaquil",
-    "ruc": "1791724186001",
-    "direccion": "Francisco e ibarra",
-    "telefono": "(02) 54 69871",
-    "correo_empresarial": "cooperativa.guayaquil@gmail.com"
-  },
-  {
     "id_cooperativa": 5,
     "nombre_cooperativa": "Cooperativa San Luis",
     "ruc": "1189371635123",
     "direccion": "Loja, 110105, Ecuador",
     "telefono": "098 172 6317",
     "correo_empresarial": "sanluiscoop@gmail.com"
+  },
+  {
+    "id_cooperativa": 1,
+    "nombre_cooperativa": "Cooperativa Loja",
+    "ruc": "1791234567899",
+    "direccion": "10 de agosto",
+    "telefono": "098 765 4321",
+    "correo_empresarial": "cooperativa.loja@gmail.com"
+  },
+  {
+    "id_cooperativa": 6,
+    "nombre_cooperativa": "Cariamanga",
+    "ruc": "1105526180123",
+    "direccion": "Cariamanga",
+    "telefono": "0989547165",
+    "correo_empresarial": "cariamanga@gmail.com"
+  },
+  {
+    "id_cooperativa": 7,
+    "nombre_cooperativa": "Carimanga",
+    "ruc": "0001105526190",
+    "direccion": "Cariamanga",
+    "telefono": "098 954 7169",
+    "correo_empresarial": "cariamang@gmail.com"
+  },
+  {
+    "id_cooperativa": 8,
+    "nombre_cooperativa": "Test Cooperativa",
+    "ruc": "1234567890123",
+    "direccion": "Test Address",
+    "telefono": "0987654321",
+    "correo_empresarial": "test@test.com"
+  },
+  {
+    "id_cooperativa": 9,
+    "nombre_cooperativa": "Test Coop",
+    "ruc": "1234567890123",
+    "direccion": "Test Addr",
+    "telefono": "0987654321",
+    "correo_empresarial": "test@test.com"
+  },
+  {
+    "id_cooperativa": 10,
+    "nombre_cooperativa": "Test Frontend",
+    "ruc": "9999999999999",
+    "direccion": "Test Dir",
+    "telefono": "0999999999",
+    "correo_empresarial": "testfrontend@test.com"
+  },
+  {
+    "id_cooperativa": 11,
+    "nombre_cooperativa": "Nambija",
+    "ruc": "1105526180125",
+    "direccion": "Av.Reina del Cisne",
+    "telefono": "0989416578",
+    "correo_empresarial": "nambija@gmail.com"
   }
 ]

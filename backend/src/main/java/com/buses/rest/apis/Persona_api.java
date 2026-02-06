@@ -346,6 +346,54 @@ public class Persona_api {
         }
     }
 
+    @Path("/recargar-saldo")
+    @PUT
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response recargarSaldo(HashMap<String, Object> map) {
+        HashMap<String, Object> response = new HashMap<>();
+        try {
+            if (map == null || !map.containsKey("id_persona") || !map.containsKey("monto")) {
+                response.put("msg", "Datos incompletos para recargar saldo");
+                return Response.status(Response.Status.BAD_REQUEST).entity(response).build();
+            }
+
+            Integer idPersona = Integer.parseInt(map.get("id_persona").toString());
+            Float monto = Float.parseFloat(map.get("monto").toString());
+
+            if (monto <= 0) {
+                response.put("msg", "El monto debe ser mayor a cero");
+                return Response.status(Response.Status.BAD_REQUEST).entity(response).build();
+            }
+
+            Controlador_persona cp = new Controlador_persona();
+            Persona persona = cp.get(idPersona);
+
+            if (persona == null) {
+                response.put("msg", "Persona no encontrada");
+                return Response.status(Response.Status.NOT_FOUND).entity(response).build();
+            }
+
+            float nuevoSaldo = persona.getSaldo_disponible() + monto;
+            persona.setSaldo_disponible(nuevoSaldo);
+            cp.setPersona(persona);
+
+            if (cp.update()) {
+                response.put("msg", "Saldo recargado correctamente");
+                response.put("saldo_disponible", nuevoSaldo);
+                response.put("persona", persona);
+                return Response.ok(response).build();
+            }
+
+            response.put("msg", "Error al recargar el saldo");
+            return Response.status(Response.Status.BAD_REQUEST).entity(response).build();
+        }
+        catch (Exception e) {
+            response.put("msg", "Error: " + e.getMessage());
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(response).build();
+        }
+    }
+
     @Path("/transferir-saldo")
     @POST
     @Consumes(MediaType.APPLICATION_JSON)

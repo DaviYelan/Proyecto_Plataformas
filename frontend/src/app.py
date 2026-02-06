@@ -3,6 +3,7 @@ from .router.route import router
 from .router.router_usuario import router_usuario
 from .router.route_bus import router_bus
 from .router.route_admin import router_admin
+from .router.router_api import router_api
 from .config import API_URL
 
 
@@ -14,6 +15,7 @@ def create_app():
     app.register_blueprint(router_usuario)
     app.register_blueprint(router_bus)
     app.register_blueprint(router_admin)
+    app.register_blueprint(router_api)
 
     @app.template_filter("formato_fecha")
     def formato_fecha(fecha):
@@ -33,5 +35,7 @@ def create_app():
     def inject_api_url():
         # Exponer API_URL a las plantillas para evitar hardcodear la URL del backend
         return {"API_URL": API_URL}
+    
+    
 
     return app
